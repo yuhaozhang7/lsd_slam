@@ -12,6 +12,7 @@
 #include "util/settings.h"
 #include "sophus/sim3.hpp"
 #include <iostream>
+#include <SLAMBenchUI.h>
 
 struct InputPointDense
 {
@@ -63,8 +64,17 @@ class Keyframe
             needsUpdate = true;
         }
 
+        void draw() {
+            computeVbo();
+            drawPoints();
+            drawCamera();
+        }
         void computeVbo()
         {
+            if (hasVbo && !needsUpdate) {
+                return;
+            }
+
             assert(!(hasVbo && !needsUpdate));
 
             if(hasVbo && needsUpdate)
@@ -142,9 +152,14 @@ class Keyframe
                 }
             }
 
+
             glGenBuffers(1, &vbo);
+
             glBindBuffer(GL_ARRAY_BUFFER, vbo);
+
             glBufferData(GL_ARRAY_BUFFER, sizeof(MyVertex) * points, tmpBuffer, GL_STATIC_DRAW);
+
+
 
             delete [] tmpBuffer;
 
@@ -159,6 +174,7 @@ class Keyframe
 
         void drawPoints()
         {
+
             assert(hasVbo);
 
             glPushMatrix();

@@ -35,7 +35,7 @@ int privateFrameAllocCount = 0;
 Frame::Frame(int id, int width, int height, const Eigen::Matrix3f& K, double timestamp, const unsigned char* image)
 {
 	initialize(id, width, height, K, timestamp);
-	
+
 	data.image[0] = FrameMemory::getInstance().getFloatBuffer(data.width[0]*data.height[0]);
 	float* maxPt = data.image[0] + data.width[0]*data.height[0];
 
@@ -56,7 +56,7 @@ Frame::Frame(int id, int width, int height, const Eigen::Matrix3f& K, double tim
 Frame::Frame(int id, int width, int height, const Eigen::Matrix3f& K, double timestamp, const float* image)
 {
 	initialize(id, width, height, K, timestamp);
-	
+
 	data.image[0] = FrameMemory::getInstance().getFloatBuffer(data.width[0]*data.height[0]);
 	memcpy(data.image[0], image, data.width[0]*data.height[0] * sizeof(float));
 	data.imageValid[0] = true;
@@ -175,8 +175,6 @@ void Frame::setPermaRef(TrackingReference* reference)
 
 void Frame::calculateMeanInformation()
 {
-	return;
-
 	if(numMappablePixels < 0)
 		maxGradients(0);
 

@@ -25,6 +25,8 @@
 #include "DataStructures/Frame.h"
 #include "Tracking/SE3Tracker.h"
 
+#include <timings.h>
+
 namespace lsd_slam
 {
 
@@ -102,7 +104,14 @@ std::vector<TrackableKFStruct> TrackableKeyFrameSearch::findEuclideanOverlapFram
 
 Frame* TrackableKeyFrameSearch::findRePositionCandidate(Frame* frame, float maxScore)
 {
+	double timings[2];
+	timings[0] = tock();
 	std::vector<TrackableKFStruct> potentialReferenceFrames = findEuclideanOverlapFrames(frame, maxScore / (KFDistWeight*KFDistWeight), 0.75);
+	timings[1] = tock();
+
+
+
+	timings[0] = tock();
 
 	float bestScore = maxScore;
 	float bestDist, bestUsage;
@@ -152,6 +161,9 @@ Frame* TrackableKeyFrameSearch::findRePositionCandidate(Frame* frame, float maxS
 		}
 	}
 
+	timings[1] = tock();
+
+
 	if(bestFrame != 0)
 	{
 		if(enablePrintDebugInfo && printRelocalizationInfo)
@@ -174,10 +186,15 @@ std::unordered_set<Frame*> TrackableKeyFrameSearch::findCandidates(Frame* keyfra
 {
 	std::unordered_set<Frame*> results;
 
+	double timings[2];
+	timings[0] = tock();
 	// Add all candidates that are similar in an euclidean sense.
 	std::vector<TrackableKFStruct> potentialReferenceFrames = findEuclideanOverlapFrames(keyframe, closenessTH * 15 / (KFDistWeight*KFDistWeight), 1.0 - 0.25 * closenessTH, true);
 	for(unsigned int i=0;i<potentialReferenceFrames.size();i++)
 		results.insert(potentialReferenceFrames[i].ref);
+
+	timings[1] = tock();
+
 
 	int appearanceBased = 0;
 	fabMapResult_out = 0;
@@ -211,7 +228,6 @@ Frame* TrackableKeyFrameSearch::findAppearanceBasedCandidate(Frame* keyframe)
 		printf("Error: called findAppearanceBasedCandidate(), but FabMap instance is not valid!\n");
 		return nullptr;
 	}
-	
 
 	int newID, loopID;
 	fabMap.compareAndAdd(keyframe, &newID, &loopID);

@@ -242,6 +242,8 @@ extern bool doSlam;
 extern bool doKFReActivation;
 extern bool doMapping;
 
+extern bool processEveryFrame;
+
 extern bool saveKeyframes;
 extern bool saveAllTracked;
 extern bool saveLoopClosureImages;

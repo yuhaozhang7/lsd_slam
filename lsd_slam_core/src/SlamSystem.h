@@ -77,7 +77,9 @@ public:
 	void randomInit(uchar* image, double timeStamp, int id);
 	void gtDepthInit(uchar* image, float* depth, double timeStamp, int id);
 
-	
+	unsigned char * rgb = NULL;
+    inline void set_rgb_image(unsigned char * p) {rgb = p;}
+    inline unsigned char * get_rgb_image() {return rgb;}
 
 	// tracks a frame.
 	// first frame will return Identity = camToWord.
@@ -119,6 +121,12 @@ public:
 	int nTrackFrame, nOptimizationIteration, nFindConstraintsItaration, nFindReferences;
 	float nAvgTrackFrame, nAvgOptimizationIteration, nAvgFindConstraintsItaration, nAvgFindReferences;
 	struct timeval lastHzUpdate;
+
+	bool relocaliserHasRun();
+
+	// Individual / no locking
+	Output3DWrapper* outputWrapper;	// no lock required
+	KeyFrameGraph* keyFrameGraph;	// has own locks
 
 
 private:
@@ -170,9 +178,7 @@ private:
 
 
 
-	// Individual / no locking
-	Output3DWrapper* outputWrapper;	// no lock required
-	KeyFrameGraph* keyFrameGraph;	// has own locks
+
 
 
 
@@ -188,6 +194,9 @@ private:
 	std::deque< std::shared_ptr<Frame> > unmappedTrackedFrames;
 	boost::mutex unmappedTrackedFramesMutex;
 	boost::condition_variable  unmappedTrackedFramesSignal;
+
+	//Process every frame mode
+	boost::condition_variable  processingOfFrameCompleteSignal;
 
 
 	// PUSHED by Mapping, READ & CLEARED by constraintFinder
@@ -208,6 +217,12 @@ private:
 	boost::thread thread_constraint_search;
 	boost::thread thread_optimization;
 	bool keepRunning; // used only on destruction to signal threads to finish.
+
+
+	//Optimisation Thread Completed for Current round of constrains
+	bool newContraintsOptimised;
+	boost::mutex newContraintsOptimisedMutex;
+	boost::condition_variable newContraintsOptimisedSignal;
 
 
 	

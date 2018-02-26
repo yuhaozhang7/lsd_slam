@@ -11,8 +11,6 @@
 #define GLM_FORCE_RADIANS
 
 #include <pangolin/pangolin.h>
-#include <pangolin/gl.h>
-#include <pangolin/gldraw.h>
 #include <map>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>

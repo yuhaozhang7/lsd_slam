@@ -24,7 +24,9 @@
 #include "IOWrapper/TimestampedObject.h"
 #include "util/SophusUtil.h"
 
-
+#if defined(ENABLE_SSE)
+#include "immintrin.h"
+#endif
 
 namespace lsd_slam
 {
@@ -51,11 +53,26 @@ inline float getInterpolatedElement(const float* const mat, const float x, const
 	float dxdy = dx*dy;
 	const float* bp = mat +ix+iy*width;
 
+	float __attribute__((aligned(16))) res;
 
-	float res =   dxdy * bp[1+width]
-				+ (dy-dxdy) * bp[width]
-				+ (dx-dxdy) * bp[1]
-				+ (1-dx-dy+dxdy) * bp[0];
+#if defined(ENABLE_SSE)
+	__m128 coef = _mm_setr_ps( dxdy, (dy-dxdy), (dx-dxdy), (1-dx-dy+dxdy));
+	__m128i offset = _mm_setr_epi32(1 + width, width, 1, 0);
+
+	__m128 m = _mm_mul_ps(coef, _mm_i32gather_ps(bp, offset, 4));
+
+	__m128 result;
+	result = _mm_hadd_ps(m, m);
+	result = _mm_hadd_ps(result, result);
+
+	_mm_store_ps(&res, result);
+#else
+
+	res = dxdy * bp[1+width]
+	      + (dy-dxdy) * bp[width]
+		  + (dx-dxdy) * bp[1]
+		  + (1-dx-dy+dxdy) * bp[0];
+#endif
 
 	return res;
 }

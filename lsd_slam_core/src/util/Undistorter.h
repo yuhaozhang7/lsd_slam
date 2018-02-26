@@ -79,6 +79,7 @@ public:
 	 * configuration file. If the format is not recognized, returns nullptr.
 	 */
 	static Undistorter* getUndistorterForFile(const char* configFilename);
+    static Undistorter* getUndistorterForVar(float f[4] , int, int);
 };
 
 class UndistorterPTAM : public Undistorter
@@ -94,6 +95,7 @@ public:
 	 * outputWidth outputHeight
 	 */
 	UndistorterPTAM(const char* configFileName);
+    UndistorterPTAM(float f[4] , int,int);
 	
 	/**
 	 * Destructor.

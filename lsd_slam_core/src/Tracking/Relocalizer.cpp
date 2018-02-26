@@ -23,6 +23,8 @@
 #include "Tracking/SE3Tracker.h"
 #include "IOWrapper/ImageDisplay.h"
 
+#include <timings.h>
+
 namespace lsd_slam
 {
 
@@ -152,6 +154,8 @@ void Relocalizer::threadLoop(int idx)
 {
 	if(!multiThreading && idx != 0) return;
 
+    double timings[2];
+
 	SE3Tracker* tracker = new SE3Tracker(w,h,K);
 
 	boost::unique_lock<boost::mutex> lock(exMutex);
@@ -160,6 +164,7 @@ void Relocalizer::threadLoop(int idx)
 		// if got something: do it (unlock in the meantime)
 		if(nextRelocIDX < maxRelocIDX && CurrentRelocFrame)
 		{
+		    timings[0] = tock();
 			Frame* todo = KFForReloc[nextRelocIDX%KFForReloc.size()];
 			nextRelocIDX++;
 			if(todo->neighbors.size() <= 2) continue;
@@ -232,6 +237,8 @@ void Relocalizer::threadLoop(int idx)
 			}
 
 			lock.lock();
+		    timings[1] = tock();
+
 		}
 		else
 		{
@@ -240,5 +247,7 @@ void Relocalizer::threadLoop(int idx)
 	}
 
 	delete tracker;
+
+
 }
 }

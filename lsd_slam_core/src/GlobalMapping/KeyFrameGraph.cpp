@@ -298,6 +298,10 @@ bool KeyFrameGraph::addElementsFromBuffer()
 	bool added = false;
 
 	keyframesForRetrackMutex.lock();
+
+	std::sort(newKeyframesBuffer.begin(), newKeyframesBuffer.end(), [](const Frame* a, const Frame* b){ return a->id() < b->id(); });
+
+
 	for (auto newKF : newKeyframesBuffer)
 	{
 		graph.addVertex(newKF->pose->graphVertex);
@@ -306,13 +310,19 @@ bool KeyFrameGraph::addElementsFromBuffer()
 
 		keyframesForRetrack.push_back(newKF);
 
+//		std::cout << "addElementsFromBuffer: " << newKF->id() << std::endl;
+
 		added = true;
 	}
 	keyframesForRetrackMutex.unlock();
 
 	newKeyframesBuffer.clear();
+
+	std::sort(newEdgeBuffer.begin(), newEdgeBuffer.end(), [](const KFConstraintStruct* a, const KFConstraintStruct* b){ if (a->firstFrame->id() < b->firstFrame->id()) return true; else if (a->secondFrame->id() == b->secondFrame->id()) return a->secondFrame->id() < b->secondFrame->id(); return false; });
+
 	for (auto edge : newEdgeBuffer)
 	{
+//		std::cout << "addElementsFromBufferEdge: (" << edge->firstFrame->id() << ", " << edge->secondFrame->id() << ")" << std::endl;
 		graph.addEdge(edge->edge);
 		added = true;
 	}

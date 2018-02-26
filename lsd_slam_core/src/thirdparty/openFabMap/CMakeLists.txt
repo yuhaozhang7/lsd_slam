@@ -25,9 +25,10 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR})
 
 # required packages
 FIND_PACKAGE(OpenCV REQUIRED)
-
+include_directories(${OpenCV_INCLUDE_DIRS})
 ############ end CMake setup ##################
 
+set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wno-unused-variable -Wno-unused-parameter -Wno-maybe-uninitialized") 
 
 ############ openFABMAP library ##################
 # tell cmake about the library
@@ -45,6 +46,8 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # Link against the required libraries in OpenCV >=2.2
 IF(OPENCV2_FOUND)
+  
+  INCLUDE_DIRECTORIES(${OPENCV2_INCLUDE})
     SET( OPENCV2_INSTALLED 1)
 #     message( STATUS "Using OpenCV >= 2.2" )
 	IF(WIN32)
@@ -65,6 +68,8 @@ IF(OPENCV2_FOUND)
 	ENDIF(WIN32)
 ENDIF(OPENCV2_FOUND)
 
+
+install(TARGETS openFABMAP  DESTINATION  lib)
 
 ############ openFABMAPcli executable ##################
 # if(OPENCV2_FOUND)

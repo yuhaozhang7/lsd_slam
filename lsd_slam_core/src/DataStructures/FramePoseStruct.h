@@ -34,6 +34,9 @@ public:
 	FramePoseStruct(Frame* frame);
 	virtual ~FramePoseStruct();
 
+
+	FramePoseStruct(FramePoseStruct const & other);
+
 	// parent, the frame originally tracked on. never changes.
 	FramePoseStruct* trackingParent;
 

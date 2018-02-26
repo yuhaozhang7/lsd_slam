@@ -24,6 +24,7 @@
 #include <fstream>
 #include <iostream>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <timings.h>
 
 #include "util/settings.h"
 #include "DepthEstimation/DepthMapPixelHypothesis.h"
@@ -147,8 +148,12 @@ void DepthMap::observeDepthRow(int yMin, int yMax, RunningStats* stats)
 }
 void DepthMap::observeDepth()
 {
-
 	threadReducer.reduce(boost::bind(&DepthMap::observeDepthRow, this, _1, _2, _3), 3, height-3, 10);
+//
+//	#pragma omp parallel for schedule(guided)
+//	for (int i = 3; i < height - 3; ++i) {
+//		observeDepthRow(i, i + 1, &runningStats);
+//	}
 
 	if(enablePrintDebugInfo && printObserveStatistics)
 	{
@@ -664,6 +669,9 @@ void DepthMap::regularizeDepthMapFillHolesRow(int yMin, int yMax, RunningStats* 
 		for(int x=3;x<width-2;x++)
 		{
 			int idx = x+y*width;
+
+//			memcpy(otherDepthMap + idx, currentDepthMap + idx, sizeof(DepthMapPixelHypothesis));
+
 			DepthMapPixelHypothesis* dest = otherDepthMap + idx;
 			if(dest->isValid) continue;
 			if(keyFrameMaxGradBuf[idx]<MIN_ABS_GRAD_DECREASE) continue;
@@ -713,6 +721,11 @@ void DepthMap::regularizeDepthMapFillHoles()
 
 	memcpy(otherDepthMap,currentDepthMap,width*height*sizeof(DepthMapPixelHypothesis));
 	threadReducer.reduce(boost::bind(&DepthMap::regularizeDepthMapFillHolesRow, this, _1, _2, _3), 3, height-2, 10);
+
+//	#pragma omp prallel for schedule(guided)
+//	for (int i = 3; i < height - 2; i++)
+//		this->regularizeDepthMapFillHolesRow(i, i + 1, &runningStats);
+
 	if(enablePrintDebugInfo && printFillHolesStatistics)
 		printf("FillHoles (discreteDepth): %d created\n",
 				runningStats.num_reg_created);
@@ -744,6 +757,11 @@ void DepthMap::buildRegIntegralBufferRow1(int yMin, int yMax, RunningStats* stat
 void DepthMap::buildRegIntegralBuffer()
 {
 	threadReducer.reduce(boost::bind(&DepthMap::buildRegIntegralBufferRow1, this, _1, _2,_3), 0, height);
+
+
+//	#pragma omp parallel for schedule(guided)
+//	for (int i = 0; i < height; i++)
+//		buildRegIntegralBufferRow1(i, i + 1, &runningStats);
 
 	int* validityIntegralBufferPT = validityIntegralBuffer;
 	int* validityIntegralBufferPT_T = validityIntegralBuffer+width;
@@ -864,9 +882,23 @@ void DepthMap::regularizeDepthMap(bool removeOcclusions, int validityTH)
 
 
 	if(removeOcclusions)
+	{
 		threadReducer.reduce(boost::bind(&DepthMap::regularizeDepthMapRow<true>, this, validityTH, _1, _2, _3), 2, height-2, 10);
+
+//		#pragma omp parallel for schedule(guided)
+//		for(int i = 2; i < height - 2; ++i)
+//			regularizeDepthMapRow<true>(validityTH, i, i + 1, &runningStats);
+
+	}
 	else
-		threadReducer.reduce(boost::bind(&DepthMap::regularizeDepthMapRow<false>, this, validityTH, _1, _2, _3), 2, height-2, 10);
+	{
+		threadReducer.reduce(boost::bind(&DepthMap::regularizeDepthMapRow<false>, this, validityTH, _1, _2, _3), 2, height - 2, 10);
+
+//		#pragma omp paralell for schedule(guided)
+//		for(int i = 2; i < height - 2; ++i)
+//			regularizeDepthMapRow<false>(validityTH, i, i + 1, &runningStats);
+
+	}
 
 
 	if(enablePrintDebugInfo && printRegularizeStatistics)
@@ -897,13 +929,14 @@ void DepthMap::initializeRandomly(Frame* new_frame)
 			if(maxGradients[x+y*width] > MIN_ABS_GRAD_CREATE)
 			{
 				float idepth = 0.5f + 1.0f * ((rand() % 100001) / 100000.0f);
+				//float idepth = 0.5f + 1.0f * ((1 % 100001) / 100000.0f);
 				currentDepthMap[x+y*width] = DepthMapPixelHypothesis(
 						idepth,
 						idepth,
 						VAR_RANDOM_INIT_INITIAL,
 						VAR_RANDOM_INIT_INITIAL,
 						20);
-			}
+			 }
 			else
 			{
 				currentDepthMap[x+y*width].isValid = false;
@@ -1074,6 +1107,8 @@ void DepthMap::updateKeyframe(std::deque< std::shared_ptr<Frame> > referenceFram
 {
 	assert(isValid());
 
+	double timings[2];
+
 	struct timeval tv_start_all, tv_end_all;
 	gettimeofday(&tv_start_all, NULL);
 
@@ -1125,7 +1160,14 @@ void DepthMap::updateKeyframe(std::deque< std::shared_ptr<Frame> > referenceFram
 
 
 	gettimeofday(&tv_start, NULL);
+
+	timings[0] = tock();
 	observeDepth();
+	timings[1] = tock();
+
+
+
+
 	gettimeofday(&tv_end, NULL);
 	msObserve = 0.9*msObserve + 0.1*((tv_end.tv_sec-tv_start.tv_sec)*1000.0f + (tv_end.tv_usec-tv_start.tv_usec)/1000.0f);
 	nObserve++;
@@ -1133,7 +1175,14 @@ void DepthMap::updateKeyframe(std::deque< std::shared_ptr<Frame> > referenceFram
 	//if(rand()%10==0)
 	{
 		gettimeofday(&tv_start, NULL);
+
+		timings[0] = tock();
+
 		regularizeDepthMapFillHoles();
+
+		timings[1] = tock();
+
+
 		gettimeofday(&tv_end, NULL);
 		msFillHoles = 0.9*msFillHoles + 0.1*((tv_end.tv_sec-tv_start.tv_sec)*1000.0f + (tv_end.tv_usec-tv_start.tv_usec)/1000.0f);
 		nFillHoles++;
@@ -1141,17 +1190,27 @@ void DepthMap::updateKeyframe(std::deque< std::shared_ptr<Frame> > referenceFram
 
 
 	gettimeofday(&tv_start, NULL);
+
+	timings[0] = tock();
 	regularizeDepthMap(false, VAL_SUM_MIN_FOR_KEEP);
+	timings[1] = tock();
+
+
 	gettimeofday(&tv_end, NULL);
 	msRegularize = 0.9*msRegularize + 0.1*((tv_end.tv_sec-tv_start.tv_sec)*1000.0f + (tv_end.tv_usec-tv_start.tv_usec)/1000.0f);
 	nRegularize++;
 
 	
 	// Update depth in keyframe
+//	std::cout << "!activeKeyFrame->depthHasBeenUpdatedFlag: " << !activeKeyFrame->depthHasBeenUpdatedFlag << std::endl;
 	if(!activeKeyFrame->depthHasBeenUpdatedFlag)
 	{
 		gettimeofday(&tv_start, NULL);
+		timings[0] = tock();
 		activeKeyFrame->setDepth(currentDepthMap);
+		timings[1] = tock();
+
+
 		gettimeofday(&tv_end, NULL);
 		msSetDepth = 0.9*msSetDepth + 0.1*((tv_end.tv_sec-tv_start.tv_sec)*1000.0f + (tv_end.tv_usec-tv_start.tv_usec)/1000.0f);
 		nSetDepth++;
@@ -1211,6 +1270,8 @@ void DepthMap::updateKeyframe(std::deque< std::shared_ptr<Frame> > referenceFram
 				runningStats.num_stereo_invalid_twoCrossing,
 				runningStats.num_stereo_invalid_bigErr);
 	}
+
+//	std::cout << "ENDING DepthMap::updateKeyframe(std::deque< std::shared_ptr<Frame> > referenceFrames)" << std::endl;
 }
 
 void DepthMap::invalidate()
@@ -1225,6 +1286,8 @@ void DepthMap::createKeyFrame(Frame* new_keyframe)
 	assert(isValid());
 	assert(new_keyframe != nullptr);
 	assert(new_keyframe->hasTrackingParent());
+
+	double timings[2];
 
 	//boost::shared_lock<boost::shared_mutex> lock = activeKeyFrame->getActiveLock();
 	boost::shared_lock<boost::shared_mutex> lock2 = new_keyframe->getActiveLock();
@@ -1248,7 +1311,12 @@ void DepthMap::createKeyFrame(Frame* new_keyframe)
 
 	struct timeval tv_start, tv_end;
 	gettimeofday(&tv_start, NULL);
+
+	timings[0] = tock();
 	propagateDepth(new_keyframe);
+	timings[1] = tock();
+
+
 	gettimeofday(&tv_end, NULL);
 	msPropagate = 0.9*msPropagate + 0.1*((tv_end.tv_sec-tv_start.tv_sec)*1000.0f + (tv_end.tv_usec-tv_start.tv_usec)/1000.0f);
 	nPropagate++;
@@ -1261,21 +1329,32 @@ void DepthMap::createKeyFrame(Frame* new_keyframe)
 
 
 	gettimeofday(&tv_start, NULL);
+
+	timings[0] = tock();
 	regularizeDepthMap(true, VAL_SUM_MIN_FOR_KEEP);
+	timings[1] = tock();
+
 	gettimeofday(&tv_end, NULL);
 	msRegularize = 0.9*msRegularize + 0.1*((tv_end.tv_sec-tv_start.tv_sec)*1000.0f + (tv_end.tv_usec-tv_start.tv_usec)/1000.0f);
 	nRegularize++;
 
 
 	gettimeofday(&tv_start, NULL);
+
+	timings[0] = tock();
 	regularizeDepthMapFillHoles();
+	timings[1] = tock();
+
 	gettimeofday(&tv_end, NULL);
 	msFillHoles = 0.9*msFillHoles + 0.1*((tv_end.tv_sec-tv_start.tv_sec)*1000.0f + (tv_end.tv_usec-tv_start.tv_usec)/1000.0f);
 	nFillHoles++;
 
 
 	gettimeofday(&tv_start, NULL);
+	timings[0] = tock();
 	regularizeDepthMap(false, VAL_SUM_MIN_FOR_KEEP);
+	timings[1] = tock();
+
 	gettimeofday(&tv_end, NULL);
 	msRegularize = 0.9*msRegularize + 0.1*((tv_end.tv_sec-tv_start.tv_sec)*1000.0f + (tv_end.tv_usec-tv_start.tv_usec)/1000.0f);
 	nRegularize++;
@@ -1309,7 +1388,11 @@ void DepthMap::createKeyFrame(Frame* new_keyframe)
 	// Update depth in keyframe
 
 	gettimeofday(&tv_start, NULL);
+	timings[0] = tock();
 	activeKeyFrame->setDepth(currentDepthMap);
+	timings[1] = tock();
+
+
 	gettimeofday(&tv_end, NULL);
 	msSetDepth = 0.9*msSetDepth + 0.1*((tv_end.tv_sec-tv_start.tv_sec)*1000.0f + (tv_end.tv_usec-tv_start.tv_usec)/1000.0f);
 	nSetDepth++;
@@ -1365,26 +1448,39 @@ void DepthMap::finalizeKeyFrame()
 {
 	assert(isValid());
 
+	double timings[2];
 
 	struct timeval tv_start_all, tv_end_all;
 	gettimeofday(&tv_start_all, NULL);
 	struct timeval tv_start, tv_end;
 
 	gettimeofday(&tv_start, NULL);
+	timings[0] = tock();
 	regularizeDepthMapFillHoles();
+	timings[1] = tock();
+
 	gettimeofday(&tv_end, NULL);
 	msFillHoles = 0.9*msFillHoles + 0.1*((tv_end.tv_sec-tv_start.tv_sec)*1000.0f + (tv_end.tv_usec-tv_start.tv_usec)/1000.0f);
 	nFillHoles++;
 
 	gettimeofday(&tv_start, NULL);
+	timings[0] = tock();
 	regularizeDepthMap(false, VAL_SUM_MIN_FOR_KEEP);
+	timings[1] = tock();
+
+
 	gettimeofday(&tv_end, NULL);
 	msRegularize = 0.9*msRegularize + 0.1*((tv_end.tv_sec-tv_start.tv_sec)*1000.0f + (tv_end.tv_usec-tv_start.tv_usec)/1000.0f);
 	nRegularize++;
 
 	gettimeofday(&tv_start, NULL);
+
+	timings[0] = tock();
 	activeKeyFrame->setDepth(currentDepthMap);
 	activeKeyFrame->calculateMeanInformation();
+	timings[1] = tock();
+
+
 	activeKeyFrame->takeReActivationData(currentDepthMap);
 	gettimeofday(&tv_end, NULL);
 	msSetDepth = 0.9*msSetDepth + 0.1*((tv_end.tv_sec-tv_start.tv_sec)*1000.0f + (tv_end.tv_usec-tv_start.tv_usec)/1000.0f);
@@ -1516,7 +1612,7 @@ inline float DepthMap::doLineStereo(
 	float incx = pClose[0] - pFar[0];
 	float incy = pClose[1] - pFar[1];
 	float eplLength = sqrt(incx*incx+incy*incy);
-	if(!eplLength > 0 || std::isinf(eplLength)) return -4;
+	if(((!eplLength) > 0) || std::isinf(eplLength)) return -4;
 
 	if(eplLength > MAX_EPL_LENGTH_CROP)
 	{
@@ -1916,7 +2012,7 @@ inline float DepthMap::doLineStereo(
 	// calculate error from photometric noise
 	float photoDispError = 4.0f * cameraPixelNoise2 / (gradAlongLine + DIVISION_EPS);
 
-	float trackingErrorFac = 0.25f*(1.0f+referenceFrame->initialTrackedResidual);
+	float trackingErrorFac = 5 * 0.25f*(1.0f+referenceFrame->initialTrackedResidual);
 
 	// calculate error from geometric noise (wrong camera pose / calibration)
 	Eigen::Vector2f gradsInterp = getInterpolatedElement42(activeKeyFrame->gradients(0), u, v, width);

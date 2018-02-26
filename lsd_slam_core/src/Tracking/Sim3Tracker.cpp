@@ -20,6 +20,7 @@
 
 #include "Sim3Tracker.h"
 #include <opencv2/highgui/highgui.hpp>
+#include <timings.h>
 #include "DataStructures/Frame.h"
 #include "Tracking/TrackingReference.h"
 #include "util/globalFuncs.h"
@@ -152,9 +153,13 @@ Sim3 Sim3Tracker::trackFrameSim3(
 		const Sim3& frameToReference_initialEstimate,
 		int startLevel, int finalLevel)
 {
+	double timings[2];
+
 	boost::shared_lock<boost::shared_mutex> lock = frame->getActiveLock();
 
 	diverged = false;
+
+
 
 
 	affineEstimation_a = 1; affineEstimation_b = 0;
@@ -183,15 +188,30 @@ Sim3 Sim3Tracker::trackFrameSim3(
 		reference->makePointCloud(lvl);
 
 		// evaluate baseline-residual.
+		timings[0] = tock();
 		callOptimized(calcSim3Buffers, (reference, frame, referenceToFrame, lvl));
+		timings[1] = tock();
+
+
+
 		if(buf_warped_size < 0.5 * MIN_GOODPERALL_PIXEL_ABSMIN * (width>>lvl)*(height>>lvl) || buf_warped_size < 10)
 		{
 			diverged = true;
 			return Sim3();
 		}
 
+		timings[0] = tock();
 		Sim3ResidualStruct lastErr = callOptimized(calcSim3WeightsAndResidual,(referenceToFrame));
+		timings[1] = tock();
+
+
+
+		timings[0] = tock();
 		if(plotSim3TrackingIterationInfo) callOptimized(calcSim3Buffers,(reference, frame, referenceToFrame, lvl, true));
+		timings[1] = tock();
+
+
+
 		numCalcResidualCalls[lvl]++;
 
 		if(useAffineLightningEstimation)
@@ -207,7 +227,12 @@ Sim3 Sim3Tracker::trackFrameSim3(
 		{
 
 			// calculate LS System, result is saved in ls.
+			timings[0] = tock();
 			callOptimized(calcSim3LGS,(ls7));
+			timings[1] = tock();
+
+
+
 			warp_update_up_to_date = true;
 			numCalcWarpUpdateCalls[lvl]++;
 
@@ -238,16 +263,32 @@ Sim3 Sim3Tracker::trackFrameSim3(
 
 
 				// re-evaluate residual
+				timings[0] = tock();
 				callOptimized(calcSim3Buffers,(reference, frame, new_referenceToFrame, lvl));
+				timings[1] = tock();
+
+
+
 				if(buf_warped_size < 0.5 * MIN_GOODPERALL_PIXEL_ABSMIN * (width>>lvl)*(height>>lvl) || buf_warped_size < 10)
 				{
 					diverged = true;
 					return Sim3();
 				}
 
+				timings[0] = tock();
 				Sim3ResidualStruct error = callOptimized(calcSim3WeightsAndResidual,(new_referenceToFrame));
+				timings[1] = tock();
+
+
+
+
+				timings[0] = tock();
 				if(plotSim3TrackingIterationInfo) callOptimized(calcSim3Buffers,(reference, frame, new_referenceToFrame, lvl, true));
 				numCalcResidualCalls[lvl]++;
+
+				timings[1] = tock();
+
+
 
 
 				// accept inc?
@@ -355,9 +396,23 @@ Sim3 Sim3Tracker::trackFrameSim3(
 	if (!warp_update_up_to_date)
 	{
 		reference->makePointCloud(finalLevel);
+		timings[0] = tock();
 		callOptimized(calcSim3Buffers,(reference, frame, referenceToFrame, finalLevel));
+		timings[1] = tock();
+
+
+
+		timings[0] = tock();
 	    finalResidual = callOptimized(calcSim3WeightsAndResidual,(referenceToFrame));
+		timings[1] = tock();
+
+
+
+		timings[0] = tock();
 	    callOptimized(calcSim3LGS,(ls7));
+		timings[1] = tock();
+
+
 	}
 
 	lastSim3Hessian = ls7.A;

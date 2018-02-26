@@ -129,7 +129,7 @@ void closeAllWindows()
 {
 	boost::unique_lock<boost::mutex> lock(openCVdisplayMutex);
 
-	if(useImageDisplayThread)
+		if(useImageDisplayThread)
 	{
 
 		if(imageDisplayThread != 0)

@@ -20,6 +20,7 @@
 
 #include "SE3Tracker.h"
 #include <opencv2/highgui/highgui.hpp>
+#include <timings.h>
 #include "DataStructures/Frame.h"
 #include "Tracking/TrackingReference.h"
 #include "util/globalFuncs.h"
@@ -162,7 +163,7 @@ SE3 SE3Tracker::trackFrameOnPermaref(
 		Frame* frame,
 		SE3 referenceToFrameOrg)
 {
-
+	double timings[2];
 	Sophus::SE3f referenceToFrame = referenceToFrameOrg.cast<float>();
 
 	boost::shared_lock<boost::shared_mutex> lock = frame->getActiveLock();
@@ -174,7 +175,13 @@ SE3 SE3Tracker::trackFrameOnPermaref(
 	diverged = false;
 	trackingWasGood = true;
 
-	callOptimized(calcResidualAndBuffers, (reference->permaRef_posData, reference->permaRef_colorAndVarData, 0, reference->permaRefNumPts, frame, referenceToFrame, QUICK_KF_CHECK_LVL, false));
+	{
+			timings[0] = tock();
+			callOptimized(calcResidualAndBuffers, (reference->permaRef_posData, reference->permaRef_colorAndVarData, 0, reference->permaRefNumPts, frame, referenceToFrame, QUICK_KF_CHECK_LVL, false));
+			timings[1] = tock();
+
+	}
+
 	if(buf_warped_size < MIN_GOODPERALL_PIXEL_ABSMIN * (width>>QUICK_KF_CHECK_LVL)*(height>>QUICK_KF_CHECK_LVL))
 	{
 		diverged = true;
@@ -186,13 +193,25 @@ SE3 SE3Tracker::trackFrameOnPermaref(
 		affineEstimation_a = affineEstimation_a_lastIt;
 		affineEstimation_b = affineEstimation_b_lastIt;
 	}
-	float lastErr = callOptimized(calcWeightsAndResidual,(referenceToFrame));
+
+	float lastErr;
+	{
+			timings[0] = tock();
+			lastErr =callOptimized(calcWeightsAndResidual, (referenceToFrame));
+			timings[1] = tock();
+
+	}
 
 	float LM_lambda = settings.lambdaInitialTestTrack;
 
 	for(int iteration=0; iteration < settings.maxItsTestTrack; iteration++)
 	{
-		callOptimized(calculateWarpUpdate,(ls));
+		{
+			timings[0] = tock();
+			callOptimized(calculateWarpUpdate, (ls));
+			timings[1] = tock();
+
+		}
 
 
 		int incTry=0;
@@ -209,15 +228,28 @@ SE3 SE3Tracker::trackFrameOnPermaref(
 			Sophus::SE3f new_referenceToFrame = Sophus::SE3f::exp((inc)) * referenceToFrame;
 
 			// re-evaluate residual
-			callOptimized(calcResidualAndBuffers, (reference->permaRef_posData, reference->permaRef_colorAndVarData, 0, reference->permaRefNumPts, frame, new_referenceToFrame, QUICK_KF_CHECK_LVL, false));
+			{
+					timings[0] = tock();
+					callOptimized(calcResidualAndBuffers, (reference->permaRef_posData, reference->permaRef_colorAndVarData, 0, reference->permaRefNumPts, frame, new_referenceToFrame, QUICK_KF_CHECK_LVL, false));
+					timings[1] = tock();
+
+			}
+
+
 			if(buf_warped_size < MIN_GOODPERALL_PIXEL_ABSMIN * (width>>QUICK_KF_CHECK_LVL)*(height>>QUICK_KF_CHECK_LVL))
 			{
 				diverged = true;
 				trackingWasGood = false;
 				return SE3();
 			}
-			float error = callOptimized(calcWeightsAndResidual,(new_referenceToFrame));
 
+			float error;
+			{
+				timings[0] = tock();
+				error = callOptimized(calcWeightsAndResidual,(new_referenceToFrame));
+				timings[1] = tock();
+
+			}
 
 			// accept inc?
 			if(error < lastErr)
@@ -280,6 +312,7 @@ SE3 SE3Tracker::trackFrame(
 		Frame* frame,
 		const SE3& frameToReference_initialEstimate)
 {
+	double timings[2];
 
 	boost::shared_lock<boost::shared_mutex> lock = frame->getActiveLock();
 	diverged = false;
@@ -318,7 +351,17 @@ SE3 SE3Tracker::trackFrame(
 
 		reference->makePointCloud(lvl);
 
-		callOptimized(calcResidualAndBuffers, (reference->posData[lvl], reference->colorAndVarData[lvl], SE3TRACKING_MIN_LEVEL == lvl ? reference->pointPosInXYGrid[lvl] : 0, reference->numData[lvl], frame, referenceToFrame, lvl, (plotTracking && lvl == SE3TRACKING_MIN_LEVEL)));
+		{
+			timings[0] = tock();
+			callOptimized(calcResidualAndBuffers,
+						  (reference->posData[lvl], reference->colorAndVarData[lvl], SE3TRACKING_MIN_LEVEL == lvl
+																					 ? reference->pointPosInXYGrid[lvl]
+																					 : 0, reference->numData[lvl], frame, referenceToFrame, lvl, (
+								  plotTracking && lvl == SE3TRACKING_MIN_LEVEL)));
+			timings[1] = tock();
+
+		}
+
 		if(buf_warped_size < MIN_GOODPERALL_PIXEL_ABSMIN * (width>>lvl)*(height>>lvl))
 		{
 			diverged = true;
@@ -331,7 +374,16 @@ SE3 SE3Tracker::trackFrame(
 			affineEstimation_a = affineEstimation_a_lastIt;
 			affineEstimation_b = affineEstimation_b_lastIt;
 		}
-		float lastErr = callOptimized(calcWeightsAndResidual,(referenceToFrame));
+
+		float lastErr;
+		{
+			timings[0] = tock();
+
+			lastErr = callOptimized(calcWeightsAndResidual, (referenceToFrame));
+
+			timings[1] = tock();
+
+		}
 
 		numCalcResidualCalls[lvl]++;
 
@@ -341,7 +393,14 @@ SE3 SE3Tracker::trackFrame(
 		for(int iteration=0; iteration < settings.maxItsPerLvl[lvl]; iteration++)
 		{
 
-			callOptimized(calculateWarpUpdate,(ls));
+			{
+				timings[0] = tock();
+
+				callOptimized(calculateWarpUpdate,(ls));
+
+				timings[1] = tock();
+
+			}
 
 			numCalcWarpUpdateCalls[lvl]++;
 
@@ -350,6 +409,7 @@ SE3 SE3Tracker::trackFrame(
 			int incTry=0;
 			while(true)
 			{
+				timings[0] = tock();
 				// solve LS system with current lambda
 				Vector6 b = -ls.b;
 				Matrix6x6 A = ls.A;
@@ -357,13 +417,28 @@ SE3 SE3Tracker::trackFrame(
 				Vector6 inc = A.ldlt().solve(b);
 				incTry++;
 
+				timings[1] = tock();
+
+
 				// apply increment. pretty sure this way round is correct, but hard to test.
 				Sophus::SE3f new_referenceToFrame = Sophus::SE3f::exp((inc)) * referenceToFrame;
 				//Sophus::SE3f new_referenceToFrame = referenceToFrame * Sophus::SE3f::exp((inc));
 
 
-				// re-evaluate residual
-				callOptimized(calcResidualAndBuffers, (reference->posData[lvl], reference->colorAndVarData[lvl], SE3TRACKING_MIN_LEVEL == lvl ? reference->pointPosInXYGrid[lvl] : 0, reference->numData[lvl], frame, new_referenceToFrame, lvl, (plotTracking && lvl == SE3TRACKING_MIN_LEVEL)));
+				{
+					timings[0] = tock();
+					// re-evaluate residual
+					callOptimized(calcResidualAndBuffers,
+								  (reference->posData[lvl], reference->colorAndVarData[lvl], SE3TRACKING_MIN_LEVEL ==
+																							 lvl
+																							 ? reference->pointPosInXYGrid[lvl]
+																							 : 0, reference->numData[lvl], frame, new_referenceToFrame, lvl, (
+										  plotTracking && lvl == SE3TRACKING_MIN_LEVEL)));
+
+					timings[1] = tock();
+
+				}
+
 				if(buf_warped_size < MIN_GOODPERALL_PIXEL_ABSMIN* (width>>lvl)*(height>>lvl))
 				{
 					diverged = true;
@@ -371,7 +446,16 @@ SE3 SE3Tracker::trackFrame(
 					return SE3();
 				}
 
-				float error = callOptimized(calcWeightsAndResidual,(new_referenceToFrame));
+				float error;
+				{
+					timings[0] = tock();
+
+					error = callOptimized(calcWeightsAndResidual,(new_referenceToFrame));
+
+					timings[1] = tock();
+
+				}
+
 				numCalcResidualCalls[lvl]++;
 
 
@@ -1033,7 +1117,7 @@ Vector6 SE3Tracker::calculateWarpUpdateSSE(
 {
 	ls.initialize(width*height);
 
-//	printf("wupd SSE\n");
+	//	printf("wupd SSE\n");
 	for(int i=0;i<buf_warped_size-3;i+=4)
 	{
 		Vector6 v1,v2,v3,v4;
@@ -1166,7 +1250,7 @@ Vector6 SE3Tracker::calculateWarpUpdateNEON(
 	float* v2_ptr;
 	float* v3_ptr;
 	float* v4_ptr;
-	for(int i=0;i<buf_warped_size;i+=4)
+	for(int i=0;i<buf_warped_siz - 3e;i+=4)
 	{
 		v1_ptr = &v1[0];
 		v2_ptr = &v2[0];
@@ -1273,12 +1357,30 @@ Vector6 SE3Tracker::calculateWarpUpdateNEON(
 
 
 Vector6 SE3Tracker::calculateWarpUpdate(
-		NormalEquationsLeastSquares &ls)
-{
+		NormalEquationsLeastSquares &ls) {
 //	weightEstimator.reset();
 //	weightEstimator.estimateDistribution(buf_warped_residual, buf_warped_size);
 //	weightEstimator.calcWeights(buf_warped_residual, buf_warped_weights, buf_warped_size);
 //
+
+//	{
+//	float px = *(buf_warped_x);
+//	float py = *(buf_warped_y);
+//	float pz = *(buf_warped_z);
+//	float r = *(buf_warped_residual);
+//	float gx = *(buf_warped_dx);
+//	float gy = *(buf_warped_dy);
+//
+//		std::cout << "px: " << px << std::endl;
+//		std::cout << "py: " << py << std::endl;
+//		std::cout << "pz: " << pz << std::endl;
+//		std::cout << "r: " << r << std::endl;
+//		std::cout << "gx: " << gx << std::endl;
+//		std::cout << "gy: " << gy << std::endl;
+//
+//	}
+
+
 	ls.initialize(width*height);
 	for(int i=0;i<buf_warped_size;i++)
 	{
@@ -1291,8 +1393,15 @@ Vector6 SE3Tracker::calculateWarpUpdate(
 		// step 3 + step 5 comp 6d error vector
 
 		float z = 1.0f / pz;
-		float z_sqr = 1.0f / (pz*pz);
+		float z_sqr = z * z ; //1.0f / (pz * pz); //z * z; //1.0f / (pz*pz);
 		Vector6 v;
+//
+//		if (fabs(z_sqr - (z*z)) > 0.00000001) {
+//			std::cout.precision(17);
+//			std::cout << std::fixed << fabs(z_sqr - (z * z)) << "pz: " << std::fixed << pz << ", z: " << std::fixed << z << ", z_sqr: " << std::fixed << z_sqr << ", z^2: " <<
+//					std::fixed <<  z * z << std::endl;
+//		}
+
 		v[0] = z*gx + 0;
 		v[1] = 0 +         z*gy;
 		v[2] = (-px * z_sqr) * gx +
@@ -1303,6 +1412,35 @@ Vector6 SE3Tracker::calculateWarpUpdate(
 			  (px * py * z_sqr) * gy;
 		v[5] = (-py * z) * gx +
 			  (px * z) * gy;
+
+//		v[0] = z*gx;
+//		v[1] = z*gy;
+//		v[5] =  (px * gy) * z - (py * gx) * z;
+//
+//		v[2] = -((px * gx) * z_sqr +
+//			     (py * gy) * z_sqr);
+//
+//		v[3] = -(gy + (((px * gx) * z_sqr) * py) +
+//				 ((py * gy) * z_sqr) * py);
+//
+//		//	   (-(py * py * z_sqr)) * gy;
+//
+//
+//		v[4] = (gx + ((px * gx) * z_sqr) * px) +
+//				(((py * gy) * z_sqr) * px);
+
+//
+//		v[0] = z*gx;
+//		v[1] = z*gy;
+//		v[2] = (-px * z_sqr) * gx + (-py * z_sqr) * gy;
+//
+//		v[3] = (-px * py * z_sqr) * gx + (-(py * py * z_sqr)) * gy - gy;
+//
+//		v[4] = gx + (px * px * z_sqr) * gx + (px * py * z_sqr) * gy;
+//
+//		v[5] = (px * gy) * z - (py * gx) * z; //(-py * z) * gx + (px * z) * gy;
+
+
 
 		// step 6: integrate into A and b:
 		ls.update(v, r, *(buf_weight_p+i));

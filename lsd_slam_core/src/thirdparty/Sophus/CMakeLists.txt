@@ -21,7 +21,7 @@ ENDIF()
 
 ################################################################################
 # Add local path for finding packages, set the local version first
-set( CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules" )
+set( CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake_modules" ${CMAKE_MODULE_PATH})
 list( APPEND CMAKE_MODULE_PATH "${CMAKE_ROOT}/Modules" )
 
 ################################################################################

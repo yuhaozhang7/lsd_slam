@@ -35,7 +35,7 @@ bool autoRunWithinFrame = true;
 int debugDisplay = 0;
 
 bool onSceenInfoDisplay = true;
-bool displayDepthMap = true;
+bool displayDepthMap = false;
 bool dumpMap = false;
 bool doFullReConstraintTrack = false;
 
@@ -74,11 +74,11 @@ float freeDebugParam3 = 1;
 float freeDebugParam4 = 1;
 float freeDebugParam5 = 1;
 
-float KFUsageWeight = 4;
-float KFDistWeight = 3;
+float KFUsageWeight = 5;
+float KFDistWeight = 5;
 
 float minUseGrad = 5;
-float cameraPixelNoise2 = 4*4;
+float cameraPixelNoise2 = 7;
 float depthSmoothingFactor = 1;
 
 bool allowNegativeIdepths = true;
@@ -91,10 +91,12 @@ bool useAffineLightningEstimation = true;
 
 bool useFabMap = false;
 bool doSlam = true;
-bool doKFReActivation = true;
+bool doKFReActivation = false;
 bool doMapping = true;
 
-int maxLoopClosureCandidates = 10;
+bool processEveryFrame = false;
+
+int maxLoopClosureCandidates = 20;
 int maxOptimizationIterations = 100;
 int propagateKeyFrameDepthCount = 0;
 float loopclosureStrictness = 1.5;
@@ -114,7 +116,7 @@ bool fullResetRequested = false;
 bool manualTrackingLossIndicated = false;
 
 
-std::string packagePath = "";
+std::string packagePath = "lsdslam/src/original_mp/";
 
 
 void handleKey(char k)

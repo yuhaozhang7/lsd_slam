@@ -11,6 +11,7 @@
 #include "IOWrapper/Output3DWrapper.h"
 #include "Keyframe.h"
 #include "GUI.h"
+#include <SLAMBenchUI.h>
 
 namespace lsd_slam
 {
@@ -28,7 +29,7 @@ struct GraphConstraint
 class PangolinOutput3DWrapper : public Output3DWrapper
 {
     public:
-        PangolinOutput3DWrapper(int width, int height, GUI & gui);
+        PangolinOutput3DWrapper(int width, int height, SLAMBenchUI * gui);
         virtual ~PangolinOutput3DWrapper();
 
         virtual void publishKeyframeGraph(KeyFrameGraph* graph);
@@ -52,7 +53,8 @@ class PangolinOutput3DWrapper : public Output3DWrapper
 
     private:
         int width, height;
-        GUI & gui;
+        SLAMBenchUI * gui;
+        std::map<int, Keyframe *> keyframes;
 };
 }
 
