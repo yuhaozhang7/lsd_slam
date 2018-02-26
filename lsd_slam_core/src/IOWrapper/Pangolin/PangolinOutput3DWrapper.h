@@ -10,8 +10,9 @@
 
 #include "IOWrapper/Output3DWrapper.h"
 #include "Keyframe.h"
-#include "GUI.h"
+#include <map>
 #include <SLAMBenchUI.h>
+#include <values/Value.h>
 
 namespace lsd_slam
 {
@@ -29,7 +30,7 @@ struct GraphConstraint
 class PangolinOutput3DWrapper : public Output3DWrapper
 {
     public:
-        PangolinOutput3DWrapper(int width, int height, SLAMBenchUI * gui);
+        PangolinOutput3DWrapper(int width, int height);
         virtual ~PangolinOutput3DWrapper();
 
         virtual void publishKeyframeGraph(KeyFrameGraph* graph);
@@ -37,24 +38,15 @@ class PangolinOutput3DWrapper : public Output3DWrapper
         // publishes a keyframe. if that frame already existis, it is overwritten, otherwise it is added.
         virtual void publishKeyframe(Frame* f);
 
-        virtual void updateImage(unsigned char * data);
+        virtual slambench::values::PointCloudValue *  getMap();
 
-        // published a tracked frame that did not become a keyframe (i.e. has no depth data)
-        virtual void publishTrackedFrame(Frame* f);
-
-        // publishes graph and all constraints, as well as updated KF poses.
-        virtual void publishTrajectory(std::vector<Eigen::Matrix<float, 3, 1>> trajectory, std::string identifier);
-
-        virtual void publishTrajectoryIncrement(Eigen::Matrix<float, 3, 1> pt, std::string identifier);
-
-        virtual void publishDebugInfo(Eigen::Matrix<float, 20, 1> data);
 
         int publishLvl;
 
     private:
         int width, height;
-        SLAMBenchUI * gui;
         std::map<int, Keyframe *> keyframes;
+
 };
 }
 

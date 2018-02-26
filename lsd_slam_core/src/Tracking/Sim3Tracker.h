@@ -18,8 +18,6 @@
 * along with LSD-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#pragma once
-#include <opencv2/core/core.hpp>
 #include "util/settings.h"
 #include "util/EigenCoreInclude.h"
 #include "util/SophusUtil.h"
@@ -71,21 +69,6 @@ public:
 	DenseDepthTrackerSettings settings;
 
 
-	// debug images
-	cv::Mat debugImageResiduals;
-	cv::Mat debugImageWeights;
-	cv::Mat debugImageSecondFrame;
-	cv::Mat debugImageOldImageSource;
-	cv::Mat debugImageOldImageWarped;
-	cv::Mat debugImageExternalWeights;
-	cv::Mat debugImageDepthResiduals;
-	cv::Mat debugImageScaleEstimation;
-
-	cv::Mat debugImageHuberWeight;
-	cv::Mat debugImageWeightD;
-	cv::Mat debugImageWeightP;
-	cv::Mat debugImageWeightedResP;
-	cv::Mat debugImageWeightedResD;
 
 
 	float* buf_warped_residual;
@@ -187,9 +170,6 @@ private:
 #endif
 
 	
-
-	void calcResidualAndBuffers_debugStart();
-	void calcResidualAndBuffers_debugFinish(int w);
 
 
 	// used for image saving

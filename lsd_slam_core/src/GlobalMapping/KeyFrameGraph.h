@@ -21,12 +21,11 @@
 #pragma once
 #include <vector>
 #include <unordered_map>
-#include <boost/thread/mutex.hpp>
-#include <boost/thread/shared_mutex.hpp>
 #include "util/EigenCoreInclude.h"
 #include <g2o/core/sparse_optimizer.h>
 #include "util/SophusUtil.h"
-#include "deque"
+#include <deque>
+#include <memory>
 
 
 namespace lsd_slam
@@ -99,7 +98,6 @@ public:
 	/** Adds a new Frame to the graph. Doesnt actually keep the frame, but only it's pose-struct. */
 	void addFrame(Frame* frame);
 
-	void dumpMap(std::string folder);
 
 	/**
 	 * Adds a new constraint to the graph.
@@ -138,18 +136,18 @@ public:
 
 	// contains ALL keyframes, as soon as they are "finished".
 	// does NOT yet contain the keyframe that is currently being created.
-	boost::shared_mutex keyframesAllMutex;
+
 	std::vector< Frame* > keyframesAll;
 
 
 	/** Maps frame ids to keyframes. Contains ALL Keyframes allocated, including the one that currently being created. */
 	/* this is where the shared pointers of Keyframe Frames are kept, so they are not deleted ever */
-	boost::shared_mutex idToKeyFrameMutex;
+
 	std::unordered_map< int, std::shared_ptr<Frame> > idToKeyFrame;
 
 
 	// contains ALL edges, as soon as they are created
-	boost::shared_mutex edgesListsMutex;
+
 	std::vector< KFConstraintStruct* > edgesAll;
 
 
@@ -157,14 +155,14 @@ public:
 	// contains ALL frame poses, chronologically, as soon as they are tracked.
 	// the corresponding frame may have been removed / deleted in the meantime.
 	// these are the ones that are also referenced by the corresponding Frame / Keyframe object
-	boost::shared_mutex allFramePosesMutex;
+
 	std::vector<FramePoseStruct* > allFramePoses;
 
 
 	// contains all keyframes in graph, in some arbitrary (random) order. if a frame is re-tracked,
 	// it is put to the end of this list; frames for re-tracking are always chosen from the first third of
 	// this list.
-	boost::mutex keyframesForRetrackMutex;
+
 	std::deque<Frame*> keyframesForRetrack;
 
 

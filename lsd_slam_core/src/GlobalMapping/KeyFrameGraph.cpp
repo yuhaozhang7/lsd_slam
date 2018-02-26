@@ -32,13 +32,12 @@
 #include <g2o/core/estimate_propagator.h>
 #include <g2o/core/sparse_optimizer_terminate_action.h>
 
-#include "opencv2/opencv.hpp"
+
 
 #include <g2o/types/sim3/sim3.h>
 #include "GlobalMapping/g2oTypeSim3Sophus.h"
 
 
-#include "IOWrapper/ImageDisplay.h"
 
 // for mkdir
 #include <sys/types.h>
@@ -110,125 +109,10 @@ void KeyFrameGraph::addFrame(Frame* frame)
 	FramePoseStruct* pose = frame->pose;
 
 
-	allFramePosesMutex.lock();
+
 	allFramePoses.push_back(pose);
-	allFramePosesMutex.unlock();
+
 }
-
-void KeyFrameGraph::dumpMap(std::string folder)
-{
-	printf("DUMP MAP: dumping to %s\n", folder.c_str());
-
-	keyframesAllMutex.lock_shared();
-	char buf[100];
-	int succ = system(("rm -rf "+folder).c_str());
-	succ += system(("mkdir "+folder).c_str());
-
-	for(unsigned int i=0;i<keyframesAll.size();i++)
-	{
-		snprintf(buf, 100, "%s/depth-%d.png", folder.c_str(), i);
-		cv::imwrite(buf, getDepthRainbowPlot(keyframesAll[i], 0));
-
-		snprintf(buf, 100, "%s/frame-%d.png", folder.c_str(), i);
-		cv::imwrite(buf, cv::Mat(keyframesAll[i]->height(), keyframesAll[i]->width(),CV_32F,keyframesAll[i]->image()));
-
-		snprintf(buf, 100, "%s/var-%d.png", folder.c_str(), i);
-		cv::imwrite(buf, getVarRedGreenPlot(keyframesAll[i]->idepthVar(),keyframesAll[i]->image(),keyframesAll[i]->width(),keyframesAll[i]->height()));
-	}
-
-
-	int i = keyframesAll.size()-1;
-	Util::displayImage("VAR PREVIEW", getVarRedGreenPlot(keyframesAll[i]->idepthVar(),keyframesAll[i]->image(),keyframesAll[i]->width(),keyframesAll[i]->height()));
-
-	printf("DUMP MAP (succ %d): dumped %d depthmaps\n", succ,  (int)keyframesAll.size());
-
-	Eigen::MatrixXf res, resD, resP, huber, usage, consistency, distance, error;
-	Eigen::VectorXf meanRootInformation, usedPixels;
-
-	res.resize(keyframesAll.size(), keyframesAll.size());
-	resD.resize(keyframesAll.size(), keyframesAll.size());
-	resP.resize(keyframesAll.size(), keyframesAll.size());
-	usage.resize(keyframesAll.size(), keyframesAll.size());
-	consistency.resize(keyframesAll.size(), keyframesAll.size());
-	distance.resize(keyframesAll.size(), keyframesAll.size());
-	error.resize(keyframesAll.size(), keyframesAll.size());
-	meanRootInformation.resize(keyframesAll.size());
-	usedPixels.resize(keyframesAll.size());
-	res.setZero();
-	resD.setZero();
-	resP.setZero();
-	usage.setZero();
-	consistency.setZero();
-	distance.setZero();
-	error.setZero();
-	meanRootInformation.setZero();
-	usedPixels.setZero();
-
-	for(unsigned int i=0;i<keyframesAll.size();i++)
-	{
-		meanRootInformation[i] = keyframesAll[i]->meanInformation;
-		usedPixels[i] = keyframesAll[i]->numPoints / (float)keyframesAll[i]->numMappablePixels;
-	}
-
-
-	edgesListsMutex.lock_shared();
-	for(unsigned int i=0;i<edgesAll.size();i++)
-	{
-		KFConstraintStruct* e = edgesAll[i];
-
-		res(e->firstFrame->idxInKeyframes, e->secondFrame->idxInKeyframes) = e->meanResidual;
-		resD(e->firstFrame->idxInKeyframes, e->secondFrame->idxInKeyframes) = e->meanResidualD;
-		resP(e->firstFrame->idxInKeyframes, e->secondFrame->idxInKeyframes) = e->meanResidualP;
-		usage(e->firstFrame->idxInKeyframes, e->secondFrame->idxInKeyframes) = e->usage;
-		consistency(e->firstFrame->idxInKeyframes, e->secondFrame->idxInKeyframes) = e->reciprocalConsistency;
-		distance(e->firstFrame->idxInKeyframes, e->secondFrame->idxInKeyframes) = e->secondToFirst.translation().norm();
-		error(e->firstFrame->idxInKeyframes, e->secondFrame->idxInKeyframes) = e->edge->chi2();
-	}
-	edgesListsMutex.unlock_shared();
-	keyframesAllMutex.unlock_shared();
-
-
-	std::ofstream fle;
-
-	fle.open(folder+"/residual.txt");
-	fle << res;
-	fle.close();
-
-	fle.open(folder+"/residualD.txt");
-	fle << resD;
-	fle.close();
-
-	fle.open(folder+"/residualP.txt");
-	fle << resP;
-	fle.close();
-
-	fle.open(folder+"/usage.txt");
-	fle << usage;
-	fle.close();
-
-	fle.open(folder+"/consistency.txt");
-	fle << consistency;
-	fle.close();
-
-	fle.open(folder+"/distance.txt");
-	fle << distance;
-	fle.close();
-
-	fle.open(folder+"/error.txt");
-	fle << error;
-	fle.close();
-
-	fle.open(folder+"/meanRootInformation.txt");
-	fle << meanRootInformation;
-	fle.close();
-
-	fle.open(folder+"/usedPixels.txt");
-	fle << usedPixels;
-	fle.close();
-
-	printf("DUMP MAP: dumped %d edges\n", (int)edgesAll.size());
-}
-
 
 
 void KeyFrameGraph::addKeyFrame(Frame* frame)
@@ -286,10 +170,10 @@ void KeyFrameGraph::insertConstraint(KFConstraintStruct* constraint)
 
 
 
-	edgesListsMutex.lock();
+
 	constraint->idxInAllEdges = edgesAll.size();
 	edgesAll.push_back(constraint);
-	edgesListsMutex.unlock();
+
 }
 
 
@@ -297,7 +181,7 @@ bool KeyFrameGraph::addElementsFromBuffer()
 {
 	bool added = false;
 
-	keyframesForRetrackMutex.lock();
+
 
 	std::sort(newKeyframesBuffer.begin(), newKeyframesBuffer.end(), [](const Frame* a, const Frame* b){ return a->id() < b->id(); });
 
@@ -314,7 +198,7 @@ bool KeyFrameGraph::addElementsFromBuffer()
 
 		added = true;
 	}
-	keyframesForRetrackMutex.unlock();
+
 
 	newKeyframesBuffer.clear();
 

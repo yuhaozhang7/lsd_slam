@@ -20,9 +20,10 @@
 
 #pragma once
 #include "util/settings.h"
-#include "boost/thread.hpp"
 #include <stdio.h>
+#include <memory>
 #include <iostream>
+#include<vector>
 #include "util/SophusUtil.h"
 
 
@@ -37,25 +38,16 @@ class Relocalizer
 public:
 	Relocalizer(int w, int h, Eigen::Matrix3f K);
 	~Relocalizer();
-
 	void updateCurrentFrame(std::shared_ptr<Frame> currentFrame);
-	void start(std::vector<Frame*> &allKeyframesList);
-	void stop();
-
-	bool waitResult(int milliseconds);
+    void run(std::vector<Frame*> &allKeyframesList);
+    inline bool isGood() {return hasResult;};
 	void getResult(Frame* &out_keyframe, std::shared_ptr<Frame> &frame, int &out_successfulFrameID, SE3 &out_frameToKeyframe);
 
 	bool isRunning;
 private:
 	int w, h;
 	Eigen::Matrix3f K;
-	boost::thread relocThreads[RELOCALIZE_THREADS];
-	bool running[RELOCALIZE_THREADS];
 
-	// locking & signalling structures
-	boost::mutex exMutex;
-	boost::condition_variable newCurrentFrameSignal;
-	boost::condition_variable resultReadySignal;
 
 	// for rapid-checking
 	std::vector<Frame*> KFForReloc;
@@ -71,8 +63,7 @@ private:
 	int resultFrameID;
 	SE3 resultFrameToKeyframe;
 
-
-	void threadLoop(int idx);
+    void seqLoop();
 };
 
 }

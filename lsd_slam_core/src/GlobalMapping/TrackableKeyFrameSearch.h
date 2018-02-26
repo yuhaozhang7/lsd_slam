@@ -24,9 +24,7 @@
 #include <unordered_set>
 #include "util/SophusUtil.h"
 
-#ifdef HAVE_FABMAP
-	#include "GlobalMapping/FabMap.h"
-#endif
+
 
 #include "util/settings.h"
 
@@ -86,10 +84,6 @@ private:
 	Frame* findAppearanceBasedCandidate(Frame* keyframe);
 	std::vector<TrackableKFStruct> findEuclideanOverlapFrames(Frame* frame, float distanceTH, float angleTH, bool checkBothScales = false);
 
-#ifdef HAVE_FABMAP
-	std::unordered_map<int, Frame*> fabmapIDToKeyframe;
-	FabMap fabMap;
-#endif
 	KeyFrameGraph* graph;
 	SE3Tracker* tracker;
 

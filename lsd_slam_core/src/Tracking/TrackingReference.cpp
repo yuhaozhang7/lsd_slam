@@ -23,7 +23,6 @@
 #include "DepthEstimation/DepthMapPixelHypothesis.h"
 #include "GlobalMapping/KeyFrameGraph.h"
 #include "util/globalFuncs.h"
-#include "IOWrapper/ImageDisplay.h"
 
 namespace lsd_slam
 {
@@ -62,15 +61,13 @@ void TrackingReference::clearAll()
 }
 TrackingReference::~TrackingReference()
 {
-	boost::unique_lock<boost::mutex> lock(accessMutex);
 	invalidate();
 	releaseAll();
 }
 
 void TrackingReference::importFrame(Frame* sourceKF)
 {
-	boost::unique_lock<boost::mutex> lock(accessMutex);
-	keyframeLock = sourceKF->getActiveLock();
+
 	keyframe = sourceKF;
 	frameID=keyframe->id();
 
@@ -82,20 +79,18 @@ void TrackingReference::importFrame(Frame* sourceKF)
 		wh_allocated = sourceKF->width(0) * sourceKF->height(0);
 	}
 	clearAll();
-	lock.unlock();
+
 }
 
 void TrackingReference::invalidate()
 {
-	if(keyframe != 0)
-		keyframeLock.unlock();
+
 	keyframe = 0;
 }
 
 void TrackingReference::makePointCloud(int level)
 {
 	assert(keyframe != 0);
-	boost::unique_lock<boost::mutex> lock(accessMutex);
 
 	if(numData[level] > 0)
 		return;	// already exists.

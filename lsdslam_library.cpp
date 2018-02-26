@@ -27,6 +27,7 @@
 #include "util/Parse.h"
 #include "util/globalFuncs.h"
 #include "front-end-shared.h"
+
 #include "timings.h"
 
 #include <io/SLAMFrame.h>
@@ -35,10 +36,15 @@
 
 #include <stdlib.h>
 #include <GlobalMapping/KeyFrameGraph.h>
+#include <DataStructures/FramePoseStruct.h>
+#include <DataStructures/Frame.h>
 #include <SLAMBenchUI.h>
 #include <SLAMBenchAPI.h>
+#include <IOWrapper/Pangolin/PangolinOutput3DWrapper.h>
 
 using namespace lsd_slam;
+
+#define LSDSLAM_ID "LSDSLAM"
 
 
 /***************************
@@ -55,7 +61,7 @@ const bool   default_poseoptim = true;
 const bool   default_useFabMap = true;
 const int    default_randSeed = 1;
 const std::string    default_camera_path = "";
-const std::string     default_package_path = "benchmarks/lsdslam/src/original/";
+const std::string     default_package_path = "benchmarks/lsdslam/src/cpp/";
 
 
 
@@ -73,8 +79,10 @@ static std::vector<unsigned char>     grey_raw;
 static std::vector<unsigned char>     grey_distorded;
 
 static sb_uint2 inputSize;
+PangolinOutput3DWrapper* outputWrapper = NULL;
 
 static slambench::io::CameraSensor *grey_sensor = nullptr;
+
 
 // algo parameters
 
@@ -106,6 +114,7 @@ static slambench::outputs::Output *grey_frame_output;
 
 bool sb_new_slam_configuration(SLAMBenchLibraryHelper * slam_settings) {
 
+    slam_settings->addParameter(TypedParameter<std::string>("cam","camera-path", "This is a camera file (original version only)." , &local_camera_path,&default_camera_path));
     slam_settings->addParameter(TypedParameter<std::string>("pack","package-path", "Path to the package lsdslam/src/cpp/ (original version only)." , &local_package_path,&default_package_path));
     slam_settings->addParameter(TypedParameter<double>("","kfusage", "Determines how often Keyframes are taken, depending on the Overlap to the current Keyframe. Larger -> more Keyframes." , &local_kfusage,&default_kfusage));
     slam_settings->addParameter(TypedParameter<double>("","kfdist",  "Determines how often Keyframes are taken, depending on the Distance to the current Keyframe. Larger -> more Keyframes." , &local_kfdist,&default_kfdist));
@@ -122,6 +131,26 @@ bool sb_new_slam_configuration(SLAMBenchLibraryHelper * slam_settings) {
 
 bool sb_init_slam_system(SLAMBenchLibraryHelper * slam_settings)  {
 
+    lsd_slam::doSlam = local_poseoptim;
+
+    lsd_slam::KFUsageWeight = local_kfusage;
+    lsd_slam::KFDistWeight = local_kfdist;
+
+    lsd_slam::minUseGrad = local_minUseGrad;
+    lsd_slam::packagePath = local_package_path;
+    lsd_slam::doKFReActivation = local_kfreactive;
+    lsd_slam::useSubpixelStereo = local_subpixelstereo;
+    lsd_slam::maxLoopClosureCandidates = local_maxLoopClosureCandiates;
+    
+    undistorter = generateUndistorter(*slam_settings);
+    cameraCalibration = generateCameraMatrix(undistorter.get());
+    
+    
+    // Handle to an LSD-SLAM instance
+    slamsystem = new SlamSystem(undistorter->getOutputWidth(), undistorter->getOutputHeight(), cameraCalibration, doSlam);
+
+    slamsystem->setVisualization(nullptr);
+    
     /**
        * Retrieve RGB and Depth sensors,
        *  - check input_size are the same
@@ -129,51 +158,33 @@ bool sb_init_slam_system(SLAMBenchLibraryHelper * slam_settings)  {
        *  - get input_file
        */
 
+	int w = undistorter->getOutputWidth();
+	int h = undistorter->getOutputHeight();
+
+	grey_raw.resize(w * h);
+	grey_distorded.resize(w * h);
+
 	slambench::io::CameraSensorFinder sensor_finder;
 	grey_sensor = sensor_finder.FindOne(slam_settings->get_sensors(), {{"camera_type", "grey"}});
-	
 	if (grey_sensor == nullptr) {
-		std::cerr << "Invalid sensors found, Grey not found." << std::endl;	
+		std::cerr << "Invalid sensors found, Grey not found." << std::endl;
+		
+		delete slamsystem;
+		
 		return false;
 	}
+	
+	// check sensor frame and pixel format
+	if(grey_sensor->PixelFormat != slambench::io::pixelformat::G_I_8) {
+		std::cerr << "Grey sensor is not in G_I_8 format" << std::endl;
+		return false;
+	}
+	if(grey_sensor->FrameFormat != slambench::io::frameformat::Raster) {
+		std::cerr << "Grey sensor is not in raster format" << std::endl;
+	}
 
-  lsd_slam::doSlam = local_poseoptim;
-  lsd_slam::packagePath = local_package_path;
-    lsd_slam::KFUsageWeight = local_kfusage;
-    lsd_slam::KFDistWeight = local_kfdist;
-
-    lsd_slam::minUseGrad = local_minUseGrad;
-
-    lsd_slam::doKFReActivation = local_kfreactive;
-    lsd_slam::useSubpixelStereo = local_subpixelstereo;
-    lsd_slam::maxLoopClosureCandidates = local_maxLoopClosureCandiates;
-
-    inputSize   = make_sb_uint2(grey_sensor->Width,grey_sensor->Height);
-
-
-        float camera[4] = {grey_sensor->Intrinsics[0],grey_sensor->Intrinsics[1],grey_sensor->Intrinsics[2],grey_sensor->Intrinsics[3]};
-
-
-    undistorter = std::unique_ptr<Undistorter>(Undistorter::getUndistorterForVar(camera,grey_sensor->Width,grey_sensor->Height));
-
-    cameraCalibration = generateCameraMatrix(undistorter.get());
-
-
-    // Handle to an LSD-SLAM instance
-    slamsystem = new SlamSystem(undistorter->getOutputWidth(), undistorter->getOutputHeight(), cameraCalibration, doSlam);
-
-    slamsystem->setVisualization(nullptr);
-
-
-    int w = undistorter->getOutputWidth();
-    int h = undistorter->getOutputHeight();
-
-
-      grey_raw.resize(w * h);
-      grey_distorded.resize(w * h);
-
-
-  	pose_output = new slambench::outputs::Output("Pose", slambench::values::VT_POSE, true);
+	inputSize   = make_sb_uint2(grey_sensor->Width,grey_sensor->Height);
+ 	pose_output = new slambench::outputs::Output("Pose", slambench::values::VT_POSE, true);
 
   	pointcloud_output = new slambench::outputs::Output("PointCloud", slambench::values::VT_POINTCLOUD, true);
   	pointcloud_output->SetKeepOnlyMostRecent(true);
@@ -186,11 +197,15 @@ bool sb_init_slam_system(SLAMBenchLibraryHelper * slam_settings)  {
   	slam_settings->GetOutputManager().RegisterOutput(pointcloud_output);
   	slam_settings->GetOutputManager().RegisterOutput(grey_frame_output);
 
+  	// Initialize Vertices
+  	outputWrapper = new PangolinOutput3DWrapper(undistorter->getOutputWidth(), undistorter->getOutputHeight());
+  	slamsystem->setVisualization(outputWrapper);
 
-      return true;
+
+	return true;
 }
 
-bool sb_update_frame (SLAMBenchLibraryHelper * slam_settings, slambench::io::SLAMFrame* s) {
+bool sb_update_frame (SLAMBenchLibraryHelper * , slambench::io::SLAMFrame* s) {
 	if(s->FrameSensor == grey_sensor) {
 		memcpy(grey_raw.data(), s->GetData(), s->GetSize());
 		s->FreeData();
@@ -264,11 +279,12 @@ bool sb_update_outputs(SLAMBenchLibraryHelper *lib, const slambench::TimeStamp *
 
 
 	if(pointcloud_output->IsActive()) {
-		///// auto map = outputWrapper->getMap () ;
-        /////
-		///// // Take lock only after generating the map
-		///// std::lock_guard<FastLock> lock (lib->GetOutputManager().GetLock());
-		///// pointcloud_output->AddPoint(last_frame_timestamp, map);
+		auto map = outputWrapper->getMap () ;
+
+		// Take lock only after generating the map
+		std::lock_guard<FastLock> lock (lib->GetOutputManager().GetLock());
+		if (map)
+			pointcloud_output->AddPoint(last_frame_timestamp, map);
 	}
 
 	if(grey_frame_output->IsActive()) {

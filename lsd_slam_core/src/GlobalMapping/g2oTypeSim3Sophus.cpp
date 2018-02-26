@@ -40,7 +40,7 @@ VertexSim3::VertexSim3() : g2o::BaseVertex<7, Sophus::Sim3d>()
 	_fix_scale = false;
 }
 
-bool VertexSim3::write(std::ostream& os) const
+bool VertexSim3::write(std::ostream& ) const
 {
 	// TODO
 	assert(false);
@@ -61,7 +61,7 @@ bool VertexSim3::write(std::ostream& os) const
 //     return os.good();
 }
 
-bool VertexSim3::read(std::istream& is)
+bool VertexSim3::read(std::istream& )
 {
 	// TODO
 	assert(false);
@@ -96,7 +96,7 @@ EdgeSim3::EdgeSim3() :
 {
 }
 
-bool EdgeSim3::write(std::ostream& os) const
+bool EdgeSim3::write(std::ostream& ) const
 {
 	// TODO
 	assert(false);
@@ -114,7 +114,7 @@ bool EdgeSim3::write(std::ostream& os) const
 //     return os.good();
 }
 
-bool EdgeSim3::read(std::istream& is)
+bool EdgeSim3::read(std::istream& )
 {
 	// TODO
 	assert(false);

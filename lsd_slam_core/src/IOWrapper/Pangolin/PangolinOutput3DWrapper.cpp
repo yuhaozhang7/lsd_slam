@@ -6,22 +6,22 @@
  */
 
 #include "PangolinOutput3DWrapper.h"
-
-#include "util/SophusUtil.h"
 #include "util/settings.h"
 #include "DataStructures/Frame.h"
 #include "GlobalMapping/KeyFrameGraph.h"
-#include "sophus/sim3.hpp"
-#include "GlobalMapping/g2oTypeSim3Sophus.h"
+#include <values/Value.h>
+
+
+#include <Eigen/Core>
 
 namespace lsd_slam
 {
 
-PangolinOutput3DWrapper::PangolinOutput3DWrapper(int width, int height, SLAMBenchUI * gui)
- : width(width),
-   height(height),
-   publishLvl(0),
-   gui(gui)
+PangolinOutput3DWrapper::PangolinOutput3DWrapper(int width, int height)
+ :
+           publishLvl(0),
+           width(width),
+           height(height)
 {
 
 }
@@ -31,16 +31,13 @@ PangolinOutput3DWrapper::~PangolinOutput3DWrapper()
 
 }
 
-void PangolinOutput3DWrapper::updateImage(unsigned char * data)
-{
-    //gui->updateRGB(data);
-}
+
 
 void PangolinOutput3DWrapper::publishKeyframe(Frame* f)
 {
+
     Keyframe * fMsg = new Keyframe;
 
-    boost::shared_lock<boost::shared_mutex> lock = f->getActiveLock();
 
     fMsg->id = f->id();
     fMsg->time = f->timestamp();
@@ -77,32 +74,115 @@ void PangolinOutput3DWrapper::publishKeyframe(Frame* f)
         pc[idx].color[3] = color[idx];
     }
 
-    lock.unlock();
+
 
     //Exists
     if(keyframes.find(fMsg->id) != keyframes.end())
     {
         keyframes[fMsg->id]->updatePoints(fMsg);
-        gui->addVisibleItem(keyframes[fMsg->id]);
         delete fMsg;
     }
     else
     {
         fMsg->initId = keyframes.size();
         keyframes[fMsg->id] = fMsg;
-        if (fMsg->id > 5) gui->addVisibleItem(keyframes[fMsg->id]);
     }
 
 }
 
+slambench::values::PointCloudValue *  PangolinOutput3DWrapper::getMap () {
 
-void PangolinOutput3DWrapper::publishTrackedFrame(Frame* kf)
-{
+	slambench::values::PointCloudValue *point_cloud = new slambench::values::PointCloudValue();
+
+    for (auto tuple : keyframes) {
+        //frame->pointData
+
+        Keyframe* frame = tuple.second;
+        InputPointDense * originalInput = (InputPointDense *)frame->pointData;
+
+        float fx = frame->fx;
+        float fy = frame->fy;
+        float cx = frame->cx;
+        float cy = frame->cy;
+
+        float fxi = 1/fx;
+        float fyi = 1/fy;
+        float cxi = -cx / fx;
+        float cyi = -cy / fy;
+
+        float my_scaledTH = 1e-3;
+        float my_absTH = 1e-1;
+        float my_scale = frame->camToWorld.scale();
+        int my_minNearSupport = 9;
+        int my_sparsifyFactor = 1;
+
+        for(int y = 1; y < height - 1; y++)
+        {
+            for(int x = 1; x < width - 1; x++)
+            {
+
+
+                if(originalInput[x + y * width].idepth <= 0)
+                            continue;
+
+                        if(my_sparsifyFactor > 1 && rand() % my_sparsifyFactor != 0)
+                            continue;
+
+                        float depth = 1 / originalInput[x + y * width].idepth;
+
+                        float depth4 = depth * depth;
+
+                        depth4 *= depth4;
+
+                        if(originalInput[x + y * width].idepth_var * depth4 > my_scaledTH)
+                            continue;
+
+                        if(originalInput[x + y * width].idepth_var * depth4 * my_scale * my_scale > my_absTH)
+                            continue;
+
+                        if(my_minNearSupport > 1)
+                        {
+                            int nearSupport = 0;
+                            for(int dx = -1; dx < 2; dx++)
+                            {
+                                for(int dy = -1; dy < 2; dy++)
+                                {
+                                    int idx = x + dx + (y + dy) * width;
+                                    if(originalInput[idx].idepth > 0)
+                                    {
+                                        float diff = originalInput[idx].idepth - 1.0f / depth;
+                                        if(diff * diff < 2 * originalInput[x + y * width].idepth_var)
+                                            nearSupport++;
+                                    }
+                                }
+                            }
+
+                            if(nearSupport < my_minNearSupport)
+                                continue;
+                        }
+
+
+
+
+
+
+                Eigen::Vector4f original = { (x * fxi + cxi) * depth , (y * fyi + cyi) * depth, depth, 1};
+                Eigen::Matrix4f mat = frame->camToWorld.matrix().cast<float>();
+                original =  mat * original;
+
+                point_cloud->AddPoint(slambench::values::Point3DF(original[0] / original[3], original[1] / original[3] , original[2] / original[3]));
+
+            }
+        }
+
+    }
+
+    return point_cloud;
 }
 
 void PangolinOutput3DWrapper::publishKeyframeGraph(KeyFrameGraph* graph)
 {
-    graph->keyframesAllMutex.lock_shared();
+
 
     int num = graph->keyframesAll.size();
 
@@ -116,7 +196,7 @@ void PangolinOutput3DWrapper::publishKeyframeGraph(KeyFrameGraph* graph)
         memcpy(framePoseData[i].camToWorld, graph->keyframesAll[i]->getScaledCamToWorld().cast<float>().data(), sizeof(float) * 7);
     }
 
-    graph->keyframesAllMutex.unlock_shared();
+
 
     for(int i = 0; i < num; i++)
      {
@@ -129,19 +209,6 @@ void PangolinOutput3DWrapper::publishKeyframeGraph(KeyFrameGraph* graph)
     delete [] buffer;
 }
 
-void PangolinOutput3DWrapper::publishTrajectory(std::vector<Eigen::Matrix<float, 3, 1>> trajectory, std::string identifier)
-{
-    //TODO
-}
 
-void PangolinOutput3DWrapper::publishTrajectoryIncrement(Eigen::Matrix<float, 3, 1> pt, std::string identifier)
-{
-    //TODO
-}
-
-void PangolinOutput3DWrapper::publishDebugInfo(Eigen::Matrix<float, 20, 1> data)
-{
-    //TODO
-}
 
 }

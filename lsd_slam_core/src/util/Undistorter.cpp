@@ -19,12 +19,11 @@
 */
 
 #include "Undistorter.h"
-
+#include <cstdlib>
+#include <cassert>
 #include <sstream>
 #include <fstream>
-
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/calib3d/calib3d.hpp>
+#include <cmath>
 #include "util/settings.h"
 
 namespace lsd_slam
@@ -34,7 +33,7 @@ Undistorter::~Undistorter()
 {
 }
 
-Undistorter* Undistorter::getUndistorterForVar(float c[4], int w, int h) {
+Undistorter* Undistorter::getUndistorterForVar(sb_float4 c, int w, int h) {
 
     Undistorter* u = new UndistorterPTAM(c,w,h);
     if(!u->isValid()) return 0;
@@ -79,10 +78,8 @@ Undistorter* Undistorter::getUndistorterForFile(const char* configFilename)
 			&ic[0], &ic[1], &ic[2], &ic[3], &ic[4],
 			&ic[5], &ic[6], &ic[7]) == 8)
 	{
-		printf("found OpenCV camera model, building rectifier.\n");
-		Undistorter* u = new UndistorterOpenCV(completeFileName.c_str());
-		if(!u->isValid()) return 0;
-		return u;
+		printf("found OpenCV camera model, unsupported case.\n");
+		exit(1);
 	}
 	else
 	{
@@ -94,7 +91,7 @@ Undistorter* Undistorter::getUndistorterForFile(const char* configFilename)
 }
 
 
-UndistorterPTAM::UndistorterPTAM(float c[4] , int w, int h) {
+UndistorterPTAM::UndistorterPTAM(sb_float4 c, int w, int h) {
     valid = true;
 
         remapX = nullptr;
@@ -103,10 +100,10 @@ UndistorterPTAM::UndistorterPTAM(float c[4] , int w, int h) {
 
 
 
-        inputCalibration[0] = c[0];
-        inputCalibration[1] = c[1];
-        inputCalibration[2] = c[2];
-        inputCalibration[3] = c[3];
+        inputCalibration[0] = c.x;
+        inputCalibration[1] = c.y;
+        inputCalibration[2] = c.z;
+        inputCalibration[3] = c.w;
         inputCalibration[4] = 0;
 
         in_width = w;
@@ -285,22 +282,17 @@ UndistorterPTAM::UndistorterPTAM(float c[4] , int w, int h) {
         }
 
 
+        originalK_(0,0)= inputCalibration[0];
+        originalK_(1,1)= inputCalibration[1];
+        originalK_(2,2)= 1;
+        originalK_(2,0)= inputCalibration[2];
+        originalK_(2,1)= inputCalibration[3];
 
-    	originalK_ = cv::Mat(3, 3, CV_64F, cv::Scalar(0));
-    	originalK_.at<double>(0, 0) = inputCalibration[0];
-    	originalK_.at<double>(1, 1) = inputCalibration[1];
-    	originalK_.at<double>(2, 2) = 1;
-    	originalK_.at<double>(2, 0) = inputCalibration[2];
-    	originalK_.at<double>(2, 1) = inputCalibration[3];
-
-    	K_ = cv::Mat(3, 3, CV_64F, cv::Scalar(0));
-    	K_.at<double>(0, 0) = outputCalibration[0] * out_width;
-    	K_.at<double>(1, 1) = outputCalibration[1] * out_height;
-    	K_.at<double>(2, 2) = 1;
-    	K_.at<double>(2, 0) = outputCalibration[2] * out_width - 0.5;
-    	K_.at<double>(2, 1) = outputCalibration[3] * out_height - 0.5;
-
-
+        K_(0,0) = outputCalibration[0] * out_width;
+        K_(1,1) = outputCalibration[1] * out_height;
+        K_(2,2) = 1;
+        K_(2,0) = outputCalibration[2] * out_width - 0.5;
+        K_(2,1) = outputCalibration[3] * out_height - 0.5;
 }
 
 UndistorterPTAM::UndistorterPTAM(const char* configFileName)
@@ -543,21 +535,18 @@ UndistorterPTAM::UndistorterPTAM(const char* configFileName)
 		out_height = in_height;
 	}
 
-	
 
-	originalK_ = cv::Mat(3, 3, CV_64F, cv::Scalar(0));
-	originalK_.at<double>(0, 0) = inputCalibration[0];
-	originalK_.at<double>(1, 1) = inputCalibration[1];
-	originalK_.at<double>(2, 2) = 1;
-	originalK_.at<double>(2, 0) = inputCalibration[2];
-	originalK_.at<double>(2, 1) = inputCalibration[3];
+	originalK_(0,0)= inputCalibration[0];
+	originalK_(1,1)= inputCalibration[1];
+	originalK_(2,3)= 1;
+	originalK_(2,0)= inputCalibration[2];
+	originalK_(2,1)= inputCalibration[3];
 
-	K_ = cv::Mat(3, 3, CV_64F, cv::Scalar(0));
-	K_.at<double>(0, 0) = outputCalibration[0] * out_width;
-	K_.at<double>(1, 1) = outputCalibration[1] * out_height;
-	K_.at<double>(2, 2) = 1;
-	K_.at<double>(2, 0) = outputCalibration[2] * out_width - 0.5;
-	K_.at<double>(2, 1) = outputCalibration[3] * out_height - 0.5;
+	K_(0,0) = outputCalibration[0] * out_width;
+	K_(1,1) = outputCalibration[1] * out_height;
+	K_(2,3) = 1;
+	K_(2,0) = outputCalibration[2] * out_width - 0.5;
+	K_(2,1) = outputCalibration[3] * out_height - 0.5;
 }
 
 UndistorterPTAM::~UndistorterPTAM()
@@ -568,34 +557,32 @@ UndistorterPTAM::~UndistorterPTAM()
 
 }
 
-void UndistorterPTAM::undistort(const cv::Mat& image, cv::OutputArray result) const
+void UndistorterPTAM::undistort(unsigned char * image, unsigned char* result_data , int cols , int  rows) const
 {
 	if (!valid)
 	{
-		result.getMatRef() = image;
+	    memcpy(result_data, image, rows  * cols );
 		return;
 	}
 	
-	if (image.rows != in_height || image.cols != in_width)
+	if (rows != in_height || cols != in_width)
 	{
 		printf("UndistorterPTAM: input image size differs from expected input size! Not undistorting.\n");
-		result.getMatRef() = image;
+        memcpy(result_data, image, rows  * cols );
 		return;
 	}
 	
 	if (in_height == out_height && in_width == out_width && inputCalibration[4] == 0)
 	{
 		// No transformation if neither distortion nor resize
-		result.getMatRef() = image;
+
+        memcpy(result_data, image, rows  * cols );
 		return;
 	}
 	
-	result.create(out_height, out_width, CV_8U);
-	cv::Mat resultMat = result.getMatRef();
-	assert(result.getMatRef().isContinuous());
-	assert(image.isContinuous());
+
 	
-	uchar* data = resultMat.data;
+	unsigned char* data = result_data;
 
 	for(int idx = out_width*out_height-1;idx>=0;idx--)
 	{
@@ -615,7 +602,7 @@ void UndistorterPTAM::undistort(const cv::Mat& image, cv::OutputArray result) co
 			float xxyy = xx*yy;
 
 			// get array base pointer
-			const uchar* src = (uchar*)image.data + xxi + yyi * in_width;
+			const unsigned char* src = (unsigned char*)image + xxi + yyi * in_width;
 
 			// interpolate (bilinear)
 			data[idx] =  xxyy * src[1+in_width]
@@ -626,12 +613,12 @@ void UndistorterPTAM::undistort(const cv::Mat& image, cv::OutputArray result) co
 	}
 }
 
-const cv::Mat& UndistorterPTAM::getK() const
+const Eigen::Matrix4f& UndistorterPTAM::getK() const
 {
 	return K_;
 }
 
-const cv::Mat& UndistorterPTAM::getOriginalK() const
+const Eigen::Matrix4f& UndistorterPTAM::getOriginalK() const
 {
 	return originalK_;
 }
@@ -661,142 +648,5 @@ bool UndistorterPTAM::isValid() const
 	return valid;
 }
 
-
-UndistorterOpenCV::UndistorterOpenCV(const char* configFileName)
-{
-	valid = true;
-	
-	// read parameters
-	std::ifstream infile(configFileName);
-	assert(infile.good());
-
-	std::string l1, l2, l3, l4;
-
-	std::getline(infile,l1);
-	std::getline(infile,l2);
-	std::getline(infile,l3);
-	std::getline(infile,l4);
-
-	// l1 & l2
-	if(std::sscanf(l1.c_str(), "%f %f %f %f %f %f %f %f",
-		&inputCalibration[0], &inputCalibration[1], &inputCalibration[2], &inputCalibration[3], &inputCalibration[4],
-		&inputCalibration[5], &inputCalibration[6], &inputCalibration[7]
-  				) == 8 &&
-			std::sscanf(l2.c_str(), "%d %d", &in_width, &in_height) == 2)
-	{
-		printf("Input resolution: %d %d\n",in_width, in_height);
-		printf("In: %f %f %f %f %f %f %f %f\n",
-				inputCalibration[0], inputCalibration[1], inputCalibration[2], inputCalibration[3], inputCalibration[4],
-				inputCalibration[5], inputCalibration[6], inputCalibration[7]);
-	}
-	else
-	{
-		printf("Failed to read camera calibration (invalid format?)\nCalibration file: %s\n", configFileName);
-		valid = false;
-	}
-
-	// l3
-	if(l3 == "crop")
-	{
-		outputCalibration = -1;
-		printf("Out: Crop\n");
-	}
-	else if(l3 == "full")
-	{
-		outputCalibration = -2;
-		printf("Out: Full\n");
-	}
-	else if(l3 == "none")
-	{
-		printf("NO RECTIFICATION\n");
-		valid = false;
-	}
-	else
-	{
-		printf("Out: Failed to Read Output pars... not rectifying.\n");
-		valid = false;
-	}
-
-	// l4
-	if(std::sscanf(l4.c_str(), "%d %d", &out_width, &out_height) == 2)
-	{
-		printf("Output resolution: %d %d\n", out_width, out_height);
-	}
-	else
-	{
-		printf("Out: Failed to Read Output resolution... not rectifying.\n");
-		valid = false;
-	}
-	
-	cv::Mat distCoeffs = cv::Mat::zeros(4, 1, CV_32F);
-	for (int i = 0; i < 4; ++ i)
-		distCoeffs.at<float>(i, 0) = inputCalibration[4 + i];
-
-	originalK_ = cv::Mat(3, 3, CV_64F, cv::Scalar(0));
-	originalK_.at<double>(0, 0) = inputCalibration[0] * in_width;
-	originalK_.at<double>(1, 1) = inputCalibration[1] * in_height;
-	originalK_.at<double>(2, 2) = 1;
-	originalK_.at<double>(0, 2) = inputCalibration[2] * in_width;
-	originalK_.at<double>(1, 2) = inputCalibration[3] * in_height;
-
-	if (valid)
-	{
-		K_ = cv::getOptimalNewCameraMatrix(originalK_, distCoeffs, cv::Size(in_width, in_height), (outputCalibration == -2) ? 1 : 0, cv::Size(out_width, out_height), nullptr, false);
-		
-		cv::initUndistortRectifyMap(originalK_, distCoeffs, cv::Mat(), K_,
-				cv::Size(out_width, out_height), CV_16SC2, map1, map2);
-		
-		originalK_.at<double>(0, 0) /= in_width;
-		originalK_.at<double>(0, 2) /= in_width;
-		originalK_.at<double>(1, 1) /= in_height;
-		originalK_.at<double>(1, 2) /= in_height;
-	}
-	
-	originalK_ = originalK_.t();
-	K_ = K_.t();
-}
-
-UndistorterOpenCV::~UndistorterOpenCV()
-{
-}
-
-void UndistorterOpenCV::undistort(const cv::Mat& image, cv::OutputArray result) const
-{
-	cv::remap(image, result, map1, map2, cv::INTER_LINEAR);
-}
-
-const cv::Mat& UndistorterOpenCV::getK() const
-{
-	return K_;
-}
-
-const cv::Mat& UndistorterOpenCV::getOriginalK() const
-{
-	return originalK_;
-}
-
-int UndistorterOpenCV::getOutputWidth() const
-{
-	return out_width;
-}
-
-int UndistorterOpenCV::getOutputHeight() const
-{
-	return out_height;
-}
-int UndistorterOpenCV::getInputWidth() const
-{
-	return in_width;
-}
-
-int UndistorterOpenCV::getInputHeight() const
-{
-	return in_height;
-}
-
-bool UndistorterOpenCV::isValid() const
-{
-	return valid;
-}
 
 }

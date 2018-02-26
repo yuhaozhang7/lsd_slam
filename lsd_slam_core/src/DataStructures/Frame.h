@@ -21,8 +21,6 @@
 #pragma once
 #include "util/SophusUtil.h"
 #include "util/settings.h"
-#include <boost/thread/recursive_mutex.hpp>
-#include <boost/thread/shared_mutex.hpp>
 #include "DataStructures/FramePoseStruct.h"
 #include "DataStructures/FrameMemory.h"
 #include "unordered_set"
@@ -132,13 +130,7 @@ public:
 	void takeReActivationData(DepthMapPixelHypothesis* depthMap);
 
 
-	// shared_lock this as long as any minimizable arrays are being used.
-	// the minimizer will only minimize frames after getting
-	// an exclusive lock on this.
-	inline boost::shared_lock<boost::shared_mutex> getActiveLock()
-	{
-		return FrameMemory::getInstance().activateFrame(this);
-	}
+
 
 
 	/*
@@ -147,7 +139,7 @@ public:
 	 * generally, everything is stored relative to the frame
 	 */
 	FramePoseStruct* pose;
-	Sim3 getScaledCamToWorld(int num=0) { return pose->getCamToWorld();}
+	Sim3 getScaledCamToWorld(int = 0) { return pose->getCamToWorld();}
 	bool hasTrackingParent() { return pose->trackingParent != nullptr;}
 	Frame* getTrackingParent() { return pose->trackingParent->frame;}
 
@@ -168,7 +160,7 @@ public:
 
 	// Tracking Reference for quick test. Always available, never taken out of memory.
 	// this is used for re-localization and re-Keyframe positioning.
-	boost::mutex permaRef_mutex;
+
 	Eigen::Vector3f* permaRef_posData;	// (x,y,z)
 	Eigen::Vector2f* permaRef_colorAndVarData;	// (I, Var)
 	int permaRefNumPts;
@@ -277,9 +269,7 @@ private:
 
 	// used internally. locked while something is being built, such that no
 	// two threads build anything simultaneously. not locked on require() if nothing is changed.
-	boost::mutex buildMutex;
 
-	boost::shared_mutex activeMutex;
 	bool isActive;
 
 	/** Releases everything which can be recalculated, but keeps the minimal
@@ -420,7 +410,6 @@ inline bool* Frame::refPixelWasGood()
 {
 	if( data.refPixelWasGood == 0)
 	{
-		boost::unique_lock<boost::mutex> lock2(buildMutex);
 
 		if(data.refPixelWasGood == 0)
 		{

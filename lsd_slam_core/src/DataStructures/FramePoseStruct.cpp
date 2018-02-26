@@ -45,15 +45,13 @@ FramePoseStruct::FramePoseStruct(Frame* frame)
 	this->graphVertex = nullptr;
 
 	privateFramePoseStructAllocCount++;
-	if(enablePrintDebugInfo && printMemoryDebugInfo)
-		printf("ALLOCATED pose %d, now there are %d\n", frameID, privateFramePoseStructAllocCount);
+
 }
 
 FramePoseStruct::~FramePoseStruct()
 {
 	privateFramePoseStructAllocCount--;
-	if(enablePrintDebugInfo && printMemoryDebugInfo)
-		printf("DELETED pose %d, now there are %d\n", frameID, privateFramePoseStructAllocCount);
+
 }
 
 FramePoseStruct::FramePoseStruct(FramePoseStruct const & other) :

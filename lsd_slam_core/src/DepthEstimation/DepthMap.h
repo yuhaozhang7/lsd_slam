@@ -20,12 +20,11 @@
 
 #pragma once
 #include "util/EigenCoreInclude.h"
-#include "opencv2/core/core.hpp"
 #include "util/settings.h"
-#include "util/IndexThreadReduce.h"
 #include "util/SophusUtil.h"
-
-
+#include <memory>
+#include <deque>
+#include <vector>
 
 namespace lsd_slam
 {
@@ -68,13 +67,6 @@ public:
 	void invalidate();
 	inline bool isValid() {return activeKeyFrame!=0;};
 
-	int debugPlotDepthMap();
-
-	// ONLY for debugging, their memory is managed (created & deleted) by this object.
-	cv::Mat debugImageHypothesisHandling;
-	cv::Mat debugImageHypothesisPropagation;
-	cv::Mat debugImageStereoLines;
-	cv::Mat debugImageDepth;
 
 	void initializeFromGTDepth(Frame* new_frame);
 	void initializeRandomly(Frame* new_frame);
@@ -92,8 +84,6 @@ public:
 
 
 
-	// pointer to global keyframe graph
-	IndexThreadReduce threadReducer;
 
 private:
 	// camera matrix etc.
@@ -107,7 +97,7 @@ private:
 	// these are just copies of the pointers given to this function, for convenience.
 	// these are NOT managed by this object!
 	Frame* activeKeyFrame;
-	boost::shared_lock<boost::shared_mutex> activeKeyFramelock;
+
 	const float* activeKeyFrameImageData;
 	bool activeKeyFrameIsReactivated;
 
@@ -131,31 +121,29 @@ private:
 			const float u, const float v, const float epxn, const float epyn,
 			const float min_idepth, const float prior_idepth, float max_idepth,
 			const Frame* const referenceFrame, const float* referenceFrameImage,
-			float &result_idepth, float &result_var, float &result_eplLength,
-			RunningStats* const stats);
+			float &result_idepth, float &result_var, float &result_eplLength);
 
 
 	void propagateDepth(Frame* new_keyframe);
 	
 
 	void observeDepth();
-	void observeDepthRow(int yMin, int yMax, RunningStats* stats);
-	bool observeDepthCreate(const int &x, const int &y, const int &idx, RunningStats* const &stats);
-	bool observeDepthUpdate(const int &x, const int &y, const int &idx, const float* keyFrameMaxGradBuf, RunningStats* const &stats);
-	bool makeAndCheckEPL(const int x, const int y, const Frame* const ref, float* pepx, float* pepy, RunningStats* const stats);
+	void observeDepthRow(int yMin, int yMax);
+	bool observeDepthCreate(const int &x, const int &y, const int &idx);
+	bool observeDepthUpdate(const int &x, const int &y, const int &idx, const float* keyFrameMaxGradBuf);
+	bool makeAndCheckEPL(const int x, const int y, const Frame* const ref, float* pepx, float* pepy);
 
 
 	void regularizeDepthMap(bool removeOcclusion, int validityTH);
-	template<bool removeOcclusions> void regularizeDepthMapRow(int validityTH, int yMin, int yMax, RunningStats* stats);
+	template<bool removeOcclusions> void regularizeDepthMapRow(int validityTH, int yMin, int yMax);
 
 
 	void buildRegIntegralBuffer();
-	void buildRegIntegralBufferRow1(int yMin, int yMax, RunningStats* stats);
+	void buildRegIntegralBufferRow1(int yMin, int yMax);
 	void regularizeDepthMapFillHoles();
-	void regularizeDepthMapFillHolesRow(int yMin, int yMax, RunningStats* stats);
+	void regularizeDepthMapFillHolesRow(int yMin, int yMax);
 
 
-	void resetCounters();
 
 	//float clocksPropagate, clocksPropagateKF, clocksObserve, msObserve, clocksReg1, clocksReg2, msReg1, msReg2, clocksFinalize;
 };

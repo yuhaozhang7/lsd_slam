@@ -18,8 +18,7 @@
 * along with LSD-SLAM. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#pragma once
-#include <opencv2/core/core.hpp>
+
 #include "util/settings.h"
 #include "util/EigenCoreInclude.h"
 #include "util/SophusUtil.h"
@@ -48,12 +47,6 @@ public:
 	DenseDepthTrackerSettings settings;
 
 
-	// debug images
-	cv::Mat debugImageResiduals;
-	cv::Mat debugImageWeights;
-	cv::Mat debugImageSecondFrame;
-	cv::Mat debugImageOldImageSource;
-	cv::Mat debugImageOldImageWarped;
 
 
 	SE3Tracker(int w, int h, Eigen::Matrix3f K);
@@ -119,28 +112,6 @@ private:
 			int level,
 			bool plotResidual = false);
 
-#if defined(ENABLE_SSE)
-	float calcResidualAndBuffersSSE(
-			const Eigen::Vector3f* refPoint,
-			const Eigen::Vector2f* refColVar,
-			int* idxBuf,
-			int refNum,
-			Frame* frame,
-			const Sophus::SE3f& referenceToFrame,
-			int level,
-			bool plotResidual = false);
-#endif
-#if defined(ENABLE_NEON)
-	float calcResidualAndBuffersNEON(
-			const Eigen::Vector3f* refPoint,
-			const Eigen::Vector2f* refColVar,
-			int* idxBuf,
-			int refNum,
-			Frame* frame,
-			const Sophus::SE3f& referenceToFrame,
-			int level,
-			bool plotResidual = false);
-#endif
 
 
 
@@ -149,14 +120,6 @@ private:
 
 	float calcWeightsAndResidual(
 			const Sophus::SE3f& referenceToFrame);
-#if defined(ENABLE_SSE)
-	float calcWeightsAndResidualSSE(
-			const Sophus::SE3f& referenceToFrame);
-#endif
-#if defined(ENABLE_NEON)
-	float calcWeightsAndResidualNEON(
-			const Sophus::SE3f& referenceToFrame);
-#endif
 
 
 
@@ -165,17 +128,7 @@ private:
 
 	Vector6 calculateWarpUpdate(
 			NormalEquationsLeastSquares &ls);
-#if defined(ENABLE_SSE)
-	Vector6 calculateWarpUpdateSSE(
-			NormalEquationsLeastSquares &ls);
-#endif
-#if defined(ENABLE_NEON)
-	Vector6 calculateWarpUpdateNEON(
-			NormalEquationsLeastSquares &ls);
-#endif
 
-	void calcResidualAndBuffers_debugStart();
-	void calcResidualAndBuffers_debugFinish(int w);
 
 
 	// used for image saving

@@ -21,8 +21,6 @@
 #pragma once
 #include "util/settings.h"
 #include "util/EigenCoreInclude.h"
-#include "boost/thread/mutex.hpp"
-#include <boost/thread/shared_mutex.hpp>
 
 
 namespace lsd_slam
@@ -54,7 +52,6 @@ public:
 	void importFrame(Frame* source);
 
 	Frame* keyframe;
-	boost::shared_lock<boost::shared_mutex> keyframeLock;
 	int frameID;
 
 	void makePointCloud(int level);
@@ -68,7 +65,6 @@ public:
 
 private:
 	int wh_allocated;
-	boost::mutex accessMutex;
 	void releaseAll();
 };
 }

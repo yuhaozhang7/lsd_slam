@@ -26,7 +26,7 @@
 #include "Tracking/SE3Tracker.h"
 
 #include <timings.h>
-
+#include <sys/time.h>
 namespace lsd_slam
 {
 
@@ -43,8 +43,7 @@ TrackableKeyFrameSearch::TrackableKeyFrameSearch(KeyFrameGraph* graph, int w, in
 	nTrackPermaRef=0;
 	nAvgTrackPermaRef=0;
 
-	if(enablePrintDebugInfo && printRelocalizationInfo)
-		printf("Relocalization Values: fowX %f, fowY %f\n", fowX, fowY);
+
 }
 
 TrackableKeyFrameSearch::~TrackableKeyFrameSearch()
@@ -72,7 +71,7 @@ std::vector<TrackableKFStruct> TrackableKeyFrameSearch::findEuclideanOverlapFram
 		distFacReciprocal = frame->meanIdepth / frame->getScaledCamToWorld().scale();
 
 	// for each frame, calculate the rough score, consisting of pose, scale and angle overlap.
-	graph->keyframesAllMutex.lock_shared();
+
 	for(unsigned int i=0;i<graph->keyframesAll.size();i++)
 	{
 		Eigen::Vector3d otherPos = graph->keyframesAll[i]->getScaledCamToWorld().translation();
@@ -94,7 +93,7 @@ std::vector<TrackableKFStruct> TrackableKeyFrameSearch::findEuclideanOverlapFram
 		potentialReferenceFrames.back().dist = dNorm2;
 		potentialReferenceFrames.back().angle = dirDotProd;
 	}
-	graph->keyframesAllMutex.unlock_shared();
+
 
 	return potentialReferenceFrames;
 }
@@ -104,18 +103,13 @@ std::vector<TrackableKFStruct> TrackableKeyFrameSearch::findEuclideanOverlapFram
 
 Frame* TrackableKeyFrameSearch::findRePositionCandidate(Frame* frame, float maxScore)
 {
-	double timings[2];
-	timings[0] = tock();
+
 	std::vector<TrackableKFStruct> potentialReferenceFrames = findEuclideanOverlapFrames(frame, maxScore / (KFDistWeight*KFDistWeight), 0.75);
-	timings[1] = tock();
 
 
-
-	timings[0] = tock();
 
 	float bestScore = maxScore;
-	float bestDist, bestUsage;
-	float bestPoseDiscrepancy = 0;
+
 	Frame* bestFrame = 0;
 	SE3 bestRefToFrame = SE3();
 	SE3 bestRefToFrame_tracked = SE3();
@@ -150,100 +144,46 @@ Frame* TrackableKeyFrameSearch::findRePositionCandidate(Frame* frame, float maxS
 
 			if(tracker->trackingWasGood && goodVal > relocalizationTH && newScore < bestScore && poseDiscrepancy < 0.2)
 			{
-				bestPoseDiscrepancy = poseDiscrepancy;
+
 				bestScore = score;
 				bestFrame = potentialReferenceFrames[i].ref;
 				bestRefToFrame = potentialReferenceFrames[i].refToFrame;
 				bestRefToFrame_tracked = RefToFrame_tracked;
-				bestDist = dist.dot(dist);
-				bestUsage = tracker->pointUsage;
+
 			}
 		}
 	}
 
-	timings[1] = tock();
-
 
 	if(bestFrame != 0)
 	{
-		if(enablePrintDebugInfo && printRelocalizationInfo)
-			printf("FindReferences for %d: Checked %d (%d). dist %.3f + usage %.3f = %.3f. pose discrepancy %.2f. TAKE %d!\n",
-					(int)frame->id(), (int)potentialReferenceFrames.size(), checkedSecondary,
-					bestDist, bestUsage, bestScore,
-					bestPoseDiscrepancy, bestFrame->id());
+
 		return bestFrame;
 	}
 	else
 	{
-		if(enablePrintDebugInfo && printRelocalizationInfo)
-			printf("FindReferences for %d: Checked %d (%d), bestScore %.2f. MAKE NEW\n",
-					(int)frame->id(), (int)potentialReferenceFrames.size(), checkedSecondary, bestScore);
+
 		return 0;
 	}
 }
 
-std::unordered_set<Frame*> TrackableKeyFrameSearch::findCandidates(Frame* keyframe, Frame* &fabMapResult_out, bool includeFABMAP, bool closenessTH)
+std::unordered_set<Frame*> TrackableKeyFrameSearch::findCandidates(Frame* keyframe, Frame* &, bool , bool closenessTH)
 {
 	std::unordered_set<Frame*> results;
 
-	double timings[2];
-	timings[0] = tock();
 	// Add all candidates that are similar in an euclidean sense.
 	std::vector<TrackableKFStruct> potentialReferenceFrames = findEuclideanOverlapFrames(keyframe, closenessTH * 15 / (KFDistWeight*KFDistWeight), 1.0 - 0.25 * closenessTH, true);
 	for(unsigned int i=0;i<potentialReferenceFrames.size();i++)
 		results.insert(potentialReferenceFrames[i].ref);
 
-	timings[1] = tock();
-
-
-	int appearanceBased = 0;
-	fabMapResult_out = 0;
-	if(includeFABMAP)
-	{
-		// Add Appearance-based Candidate, and all it's neighbours.
-		fabMapResult_out = findAppearanceBasedCandidate(keyframe);
-		if(fabMapResult_out != nullptr)
-		{
-			results.insert(fabMapResult_out);
-			results.insert(fabMapResult_out->neighbors.begin(), fabMapResult_out->neighbors.end());
-			appearanceBased = 1 + fabMapResult_out->neighbors.size();
-		}
-	}
-
-	if (enablePrintDebugInfo && printConstraintSearchInfo)
-		printf("Early LoopClosure-Candidates for %d: %d euclidean, %d appearance-based, %d total\n",
-				(int)keyframe->id(), (int)potentialReferenceFrames.size(), appearanceBased, (int)results.size());
-
 	return results;
 }
 
-Frame* TrackableKeyFrameSearch::findAppearanceBasedCandidate(Frame* keyframe)
+Frame* TrackableKeyFrameSearch::findAppearanceBasedCandidate(Frame* )
 {
-#ifdef HAVE_FABMAP
-	if(!useFabMap) return nullptr;
 
-
-	if (! fabMap.isValid())
-	{
-		printf("Error: called findAppearanceBasedCandidate(), but FabMap instance is not valid!\n");
-		return nullptr;
-	}
-
-	int newID, loopID;
-	fabMap.compareAndAdd(keyframe, &newID, &loopID);
-	if (newID < 0)
-		return nullptr;
-	
-	fabmapIDToKeyframe.insert(std::make_pair(newID, keyframe));
-	if (loopID >= 0)
-		return fabmapIDToKeyframe.at(loopID);
-	else
-		return nullptr;
-#else
-	if(useFabMap)
-		printf("Warning: Compiled without FabMap, but useFabMap is enabled... ignoring.\n");
 	return nullptr;
-#endif
+
 }
 
 

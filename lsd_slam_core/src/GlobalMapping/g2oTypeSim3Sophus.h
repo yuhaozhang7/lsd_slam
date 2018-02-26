@@ -19,6 +19,7 @@
 */
 
 #pragma once
+#include <iostream>
 #include "util/SophusUtil.h"
 
 #include "g2o/core/base_vertex.h"

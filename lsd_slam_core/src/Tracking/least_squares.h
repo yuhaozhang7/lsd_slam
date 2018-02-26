@@ -19,9 +19,7 @@
 */
 
 #pragma once
-
 #include "util/EigenCoreInclude.h"
-#include <opencv2/core/core.hpp>
 
 
 

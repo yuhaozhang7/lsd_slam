@@ -19,7 +19,6 @@
 */
 
 #pragma once
-#include <opencv2/core/core.hpp>
 #include "util/settings.h"
 #include "util/EigenCoreInclude.h"
 
@@ -90,7 +89,6 @@ public:
 			idepth_smoothed(-1),
 			idepth_var_smoothed(-1) {};
 
-	cv::Vec3b getVisualizationColor(int lastFrameID) const;
 };
 
 }

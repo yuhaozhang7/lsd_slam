@@ -19,54 +19,22 @@
 */
 
 #include "util/settings.h"
-#include <opencv2/opencv.hpp>
-#include <boost/bind.hpp>
 
 
 
 namespace lsd_slam
 {
-RunningStats runningStats;
 
 
 bool autoRun = true;
 bool autoRunWithinFrame = true;
 
-int debugDisplay = 0;
+
 
 bool onSceenInfoDisplay = true;
 bool displayDepthMap = false;
 bool dumpMap = false;
 bool doFullReConstraintTrack = false;
-
-// dyn config
-bool printPropagationStatistics = false;
-bool printFillHolesStatistics = false;
-bool printObserveStatistics = false;
-bool printObservePurgeStatistics = false;
-bool printRegularizeStatistics = false;
-bool printLineStereoStatistics = false;
-bool printLineStereoFails = false;
-
-bool printTrackingIterationInfo = false;
-
-bool printFrameBuildDebugInfo = false;
-bool printMemoryDebugInfo = false;
-
-bool printKeyframeSelectionInfo = false;
-bool printConstraintSearchInfo = false;
-bool printOptimizationInfo = false;
-bool printRelocalizationInfo = false;
-
-bool printThreadingInfo = false;
-bool printMappingTiming = false;
-bool printOverallTiming = false;
-
-bool plotTrackingIterationInfo = false;
-bool plotSim3TrackingIterationInfo = false;
-bool plotStereoImages = false;
-bool plotTracking = false;
-
 
 float freeDebugParam1 = 1;
 float freeDebugParam2 = 1;
@@ -89,12 +57,10 @@ bool useAffineLightningEstimation = true;
 
 
 
-bool useFabMap = false;
+
 bool doSlam = true;
 bool doKFReActivation = false;
 bool doMapping = true;
-
-bool processEveryFrame = false;
 
 int maxLoopClosureCandidates = 20;
 int maxOptimizationIterations = 100;
@@ -116,7 +82,7 @@ bool fullResetRequested = false;
 bool manualTrackingLossIndicated = false;
 
 
-std::string packagePath = "lsdslam/src/original_mp/";
+std::string packagePath = "lsdslam/src/cpp/";
 
 
 void handleKey(char k)
@@ -129,14 +95,6 @@ void handleKey(char k)
 		break;
 	case 's': case 'S':
 //		autoRunWithinFrame = !autoRunWithinFrame; 	// disabled... only use for debugging & if you really, really know what you are doing
-		break;
-	case 'd': case 'D':
-		debugDisplay = (debugDisplay+1)%6;
-		printf("debugDisplay is now: %d\n", debugDisplay);
-		break;
-	case 'e': case 'E':
-		debugDisplay = (debugDisplay-1+6)%6;
-		printf("debugDisplay is now: %d\n", debugDisplay);
 		break;
 	case 'o': case 'O':
 		onSceenInfoDisplay = !onSceenInfoDisplay;

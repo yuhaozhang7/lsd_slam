@@ -49,8 +49,6 @@ Frame::Frame(int id, int width, int height, const Eigen::Matrix3f& K, double tim
 
 	privateFrameAllocCount++;
 
-	if(enablePrintDebugInfo && printMemoryDebugInfo)
-		printf("ALLOCATED frame %d, now there are %d\n", this->id(), privateFrameAllocCount);
 }
 
 Frame::Frame(int id, int width, int height, const Eigen::Matrix3f& K, double timestamp, const float* image)
@@ -63,15 +61,11 @@ Frame::Frame(int id, int width, int height, const Eigen::Matrix3f& K, double tim
 
 	privateFrameAllocCount++;
 
-	if(enablePrintDebugInfo && printMemoryDebugInfo)
-		printf("ALLOCATED frame %d, now there are %d\n", this->id(), privateFrameAllocCount);
 }
 
 Frame::~Frame()
 {
 
-	if(enablePrintDebugInfo && printMemoryDebugInfo)
-		printf("DELETING frame %d\n", this->id());
 
 	FrameMemory::getInstance().deactivateFrame(this);
 
@@ -99,14 +93,12 @@ Frame::~Frame()
 		delete permaRef_posData;
 
 	privateFrameAllocCount--;
-	if(enablePrintDebugInfo && printMemoryDebugInfo)
-		printf("DELETED frame %d, now there are %d\n", this->id(), privateFrameAllocCount);
+
 }
 
 
 void Frame::takeReActivationData(DepthMapPixelHypothesis* depthMap)
 {
-	boost::shared_lock<boost::shared_mutex> lock = getActiveLock();
 
 	if(data.validity_reAct == 0)
 		data.validity_reAct = (unsigned char*) FrameMemory::getInstance().getBuffer(data.width[0]*data.height[0]);
@@ -151,7 +143,6 @@ void Frame::setPermaRef(TrackingReference* reference)
 	assert(reference->frameID == id());
 	reference->makePointCloud(QUICK_KF_CHECK_LVL);
 
-	permaRef_mutex.lock();
 
 	if(permaRef_colorAndVarData != 0)
 		delete permaRef_colorAndVarData;
@@ -170,7 +161,6 @@ void Frame::setPermaRef(TrackingReference* reference)
 			reference->posData[QUICK_KF_CHECK_LVL],
 			sizeof(Eigen::Vector3f) * permaRefNumPts);
 
-	permaRef_mutex.unlock();
 }
 
 void Frame::calculateMeanInformation()
@@ -197,8 +187,6 @@ void Frame::calculateMeanInformation()
 void Frame::setDepth(const DepthMapPixelHypothesis* newDepth)
 {
 
-	boost::shared_lock<boost::shared_mutex> lock = getActiveLock();
-	boost::unique_lock<boost::mutex> lock2(buildMutex);
 
 	if(data.idepth[0] == 0)
 		data.idepth[0] = FrameMemory::getInstance().getFloatBuffer(data.width[0]*data.height[0]);
@@ -242,12 +230,10 @@ void Frame::setDepth(const DepthMapPixelHypothesis* newDepth)
 
 void Frame::setDepthFromGroundTruth(const float* depth, float cov_scale)
 {
-	boost::shared_lock<boost::shared_mutex> lock = getActiveLock();
 	const float* pyrMaxGradient = maxGradients(0);
 
 
 
-	boost::unique_lock<boost::mutex> lock2(buildMutex);
 	if(data.idepth[0] == 0)
 		data.idepth[0] = FrameMemory::getInstance().getFloatBuffer(data.width[0]*data.height[0]);
 	if(data.idepthVar[0] == 0)
@@ -374,22 +360,14 @@ void Frame::release(int dataFlags, bool pyramidsOnly, bool invalidateOnly)
 
 bool Frame::minimizeInMemory()
 {
-	if(activeMutex.timed_lock(boost::posix_time::milliseconds(10)))
-	{
-		buildMutex.lock();
-		if(enablePrintDebugInfo && printMemoryDebugInfo)
-			printf("minimizing frame %d\n",id());
 
 		release(IMAGE | IDEPTH | IDEPTH_VAR, true, false);
 		release(GRADIENTS | MAX_GRADIENTS, false, false);
 
 		clear_refPixelWasGood();
 
-		buildMutex.unlock();
-		activeMutex.unlock();
 		return true;
-	}
-	return false;
+
 }
 
 void Frame::initialize(int id, int width, int height, const Eigen::Matrix3f& K, double timestamp)
@@ -495,13 +473,11 @@ void Frame::buildImage(int level)
 	}
 	
 	require(IMAGE, level - 1);
-	boost::unique_lock<boost::mutex> lock2(buildMutex);
 
 	if(data.imageValid[level])
 		return;
 
-	if(enablePrintDebugInfo && printFrameBuildDebugInfo)
-		printf("CREATE Image lvl %d for frame %d\n", level, id());
+
 
 	int width = data.width[level - 1];
 	int height = data.height[level - 1];
@@ -511,103 +487,6 @@ void Frame::buildImage(int level)
 		data.image[level] = FrameMemory::getInstance().getFloatBuffer(data.width[level] * data.height[level]);
 	float* dest = data.image[level];
 
-#if defined(ENABLE_SSE)
-	// I assume all all subsampled width's are a multiple of 8.
-	// if this is not the case, this still works except for the last * pixel, which will produce a segfault.
-	// in that case, reduce this loop and calculate the last 0-3 dest pixels by hand....
-	if (width % 8 == 0)
-	{
-		__m128 p025 = _mm_setr_ps(0.25f,0.25f,0.25f,0.25f);
-
-		const float* maxY = source+width*height;
-		for(const float* y = source; y < maxY; y+=width*2)
-		{
-			const float* maxX = y+width;
-			for(const float* x=y; x < maxX; x += 8)
-			{
-				// i am calculating four dest pixels at a time.
-
-				__m128 top_left = _mm_load_ps((float*)x);
-				__m128 bot_left = _mm_load_ps((float*)x+width);
-				__m128 left = _mm_add_ps(top_left,bot_left);
-
-				__m128 top_right = _mm_load_ps((float*)x+4);
-				__m128 bot_right = _mm_load_ps((float*)x+width+4);
-				__m128 right = _mm_add_ps(top_right,bot_right);
-
-				__m128 sumA = _mm_shuffle_ps(left,right, _MM_SHUFFLE(2,0,2,0));
-				__m128 sumB = _mm_shuffle_ps(left,right, _MM_SHUFFLE(3,1,3,1));
-
-				__m128 sum = _mm_add_ps(sumA,sumB);
-				sum = _mm_mul_ps(sum,p025);
-
-				_mm_store_ps(dest, sum);
-				dest += 4;
-			}
-		}
-
-		data.imageValid[level] = true;
-		return;
-	}
-#elif defined(ENABLE_NEON)
-	// I assume all all subsampled width's are a multiple of 8.
-	// if this is not the case, this still works except for the last * pixel, which will produce a segfault.
-	// in that case, reduce this loop and calculate the last 0-3 dest pixels by hand....
-	if (width % 8 == 0)
-	{
-		static const float p025[] = {0.25, 0.25, 0.25, 0.25};
-		int width_iteration_count = width / 8;
-		int height_iteration_count = height / 2;
-		const float* cur_px = source;
-		const float* next_row_px = source + width;
-		
-		__asm__ __volatile__
-		(
-			"vldmia %[p025], {q10}                        \n\t" // p025(q10)
-			
-			".height_loop:                                \n\t"
-			
-				"mov r5, %[width_iteration_count]             \n\t" // store width_iteration_count
-				".width_loop:                                 \n\t"
-				
-					"vldmia   %[cur_px]!, {q0-q1}             \n\t" // top_left(q0), top_right(q1)
-					"vldmia   %[next_row_px]!, {q2-q3}        \n\t" // bottom_left(q2), bottom_right(q3)
-		
-					"vadd.f32 q0, q0, q2                      \n\t" // left(q0)
-					"vadd.f32 q1, q1, q3                      \n\t" // right(q1)
-		
-					"vpadd.f32 d0, d0, d1                     \n\t" // pairwise add into sum(q0)
-					"vpadd.f32 d1, d2, d3                     \n\t"
-					"vmul.f32 q0, q0, q10                     \n\t" // multiply with 0.25 to get average
-					
-					"vstmia %[dest]!, {q0}                    \n\t"
-				
-				"subs     %[width_iteration_count], %[width_iteration_count], #1 \n\t"
-				"bne      .width_loop                     \n\t"
-				"mov      %[width_iteration_count], r5    \n\t" // restore width_iteration_count
-				
-				// Advance one more line
-				"add      %[cur_px], %[cur_px], %[rowSize]    \n\t"
-				"add      %[next_row_px], %[next_row_px], %[rowSize] \n\t"
-			
-			"subs     %[height_iteration_count], %[height_iteration_count], #1 \n\t"
-			"bne      .height_loop                       \n\t"
-
-			: /* outputs */ [cur_px]"+&r"(cur_px),
-							[next_row_px]"+&r"(next_row_px),
-							[width_iteration_count]"+&r"(width_iteration_count),
-							[height_iteration_count]"+&r"(height_iteration_count),
-							[dest]"+&r"(dest)
-			: /* inputs  */ [p025]"r"(p025),
-							[rowSize]"r"(width * sizeof(float))
-			: /* clobber */ "memory", "cc", "r5",
-							"q0", "q1", "q2", "q3", "q10"
-		);
-
-		data.imageValid[level] = true;
-		return;
-	}
-#endif
 
 	int wh = width*height;
 	const float* s;
@@ -641,13 +520,10 @@ void Frame::releaseImage(int level)
 void Frame::buildGradients(int level)
 {
 	require(IMAGE, level);
-	boost::unique_lock<boost::mutex> lock2(buildMutex);
 
 	if(data.gradientsValid[level])
 		return;
 
-	if(enablePrintDebugInfo && printFrameBuildDebugInfo)
-		printf("CREATE Gradients lvl %d for frame %d\n", level, id());
 
 	int width = data.width[level];
 	int height = data.height[level];
@@ -688,12 +564,9 @@ void Frame::releaseGradients(int level)
 void Frame::buildMaxGradients(int level)
 {
 	require(GRADIENTS, level);
-	boost::unique_lock<boost::mutex> lock2(buildMutex);
 
 	if(data.maxGradientsValid[level]) return;
 
-	if(enablePrintDebugInfo && printFrameBuildDebugInfo)
-		printf("CREATE AbsGrad lvl %d for frame %d\n", level, id());
 
 	int width = data.width[level];
 	int height = data.height[level];
@@ -784,13 +657,11 @@ void Frame::buildIDepthAndIDepthVar(int level)
 	}
 
 	require(IDEPTH, level - 1);
-	boost::unique_lock<boost::mutex> lock2(buildMutex);
 	
 	if(data.idepthValid[level] && data.idepthVarValid[level])
 		return;
 
-	if(enablePrintDebugInfo && printFrameBuildDebugInfo)
-		printf("CREATE IDepth lvl %d for frame %d\n", level, id());
+
 	
 	int width = data.width[level];
 	int height = data.height[level];

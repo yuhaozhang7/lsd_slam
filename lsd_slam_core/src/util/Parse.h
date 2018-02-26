@@ -10,7 +10,6 @@
 
 #include <dirent.h>
 #include <string>
-#include <boost/filesystem.hpp>
 
 class Parse
 {

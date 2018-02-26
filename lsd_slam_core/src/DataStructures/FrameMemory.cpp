@@ -38,14 +38,12 @@ FrameMemory& FrameMemory::getInstance()
 
 void FrameMemory::releaseBuffes()
 {
-	boost::unique_lock<boost::mutex> lock(accessMutex);
 	int total = 0;
 
 
 	for(auto p : availableBuffers)
 	{
-		if(printMemoryDebugInfo)
-			printf("deleting %d buffers of size %d!\n", (int)p.second.size(), (int)p.first);
+
 
 		total += p.second.size() * p.first;
 
@@ -59,14 +57,12 @@ void FrameMemory::releaseBuffes()
 	}
 	availableBuffers.clear();
 
-	if(printMemoryDebugInfo)
-		printf("released %.1f MB!\n", total / (1000000.0f));
+
 }
 
 
 void* FrameMemory::getBuffer(unsigned int sizeInByte)
 {
-	boost::unique_lock<boost::mutex> lock(accessMutex);
 	
 	if (availableBuffers.count(sizeInByte) > 0)
 	{
@@ -103,7 +99,6 @@ void FrameMemory::returnBuffer(void* buffer)
 {
 	if(buffer==0) return;
 
-	boost::unique_lock<boost::mutex> lock(accessMutex);
 	
 	unsigned int size = bufferSizes.at(buffer);
 	//printf("returnFloatBuffer(%d)\n", size);
@@ -126,18 +121,17 @@ void* FrameMemory::allocateBuffer(unsigned int size)
 	return buffer;
 }
 
-boost::shared_lock<boost::shared_mutex> FrameMemory::activateFrame(Frame* frame)
+void FrameMemory::activateFrame(Frame* frame)
 {
-	boost::unique_lock<boost::mutex> lock(activeFramesMutex);
+
 	if(frame->isActive)
 		activeFrames.remove(frame);
 	activeFrames.push_front(frame);
 	frame->isActive = true;
-	return boost::shared_lock<boost::shared_mutex>(frame->activeMutex);
+
 }
 void FrameMemory::deactivateFrame(Frame* frame)
 {
-	boost::unique_lock<boost::mutex> lock(activeFramesMutex);
 	if(!frame->isActive) return;
 	activeFrames.remove(frame);
 
@@ -148,7 +142,6 @@ void FrameMemory::deactivateFrame(Frame* frame)
 }
 void FrameMemory::pruneActiveFrames()
 {
-	boost::unique_lock<boost::mutex> lock(activeFramesMutex);
 
 	while((int)activeFrames.size() > maxLoopClosureCandidates + 20)
 	{

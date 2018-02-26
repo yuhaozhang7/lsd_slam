@@ -21,9 +21,8 @@
 #ifndef _UNDISTORTER_HPP_
 #define _UNDISTORTER_HPP_
 
-#include <opencv2/core/core.hpp>
-
-
+#include <math_types.h>
+#include <Eigen/Core>
 
 namespace lsd_slam
 {
@@ -36,17 +35,17 @@ public:
 	/**
 	 * Undistorts the given image and returns the result image.
 	 */
-	virtual void undistort(const cv::Mat& image, cv::OutputArray result) const = 0;
+	virtual void undistort( unsigned char * image, unsigned  char * result , int , int) const = 0;
 	
 	/**
 	 * Returns the intrinsic parameter matrix of the undistorted images.
 	 */
-	virtual const cv::Mat& getK() const = 0;
+	virtual const Eigen::Matrix4f& getK() const = 0;
 	
 	/**
 	 * Returns the intrinsic parameter matrix of the original images,
 	 */
-	virtual const cv::Mat& getOriginalK() const = 0;
+	virtual const Eigen::Matrix4f& getOriginalK() const = 0;
 	
 	/**
 	 * Returns the width of the undistorted images in pixels.
@@ -79,7 +78,7 @@ public:
 	 * configuration file. If the format is not recognized, returns nullptr.
 	 */
 	static Undistorter* getUndistorterForFile(const char* configFilename);
-    static Undistorter* getUndistorterForVar(float f[4] , int, int);
+    static Undistorter* getUndistorterForVar(sb_float4 , int, int);
 };
 
 class UndistorterPTAM : public Undistorter
@@ -95,7 +94,7 @@ public:
 	 * outputWidth outputHeight
 	 */
 	UndistorterPTAM(const char* configFileName);
-    UndistorterPTAM(float f[4] , int,int);
+    UndistorterPTAM(sb_float4 , int,int);
 	
 	/**
 	 * Destructor.
@@ -108,17 +107,17 @@ public:
 	/**
 	 * Undistorts the given image and returns the result image.
 	 */
-	void undistort(const cv::Mat& image, cv::OutputArray result) const;
+	void undistort( unsigned  char * image,  unsigned  char* result, int , int ) const;
 	
 	/**
 	 * Returns the intrinsic parameter matrix of the undistorted images.
 	 */
-	const cv::Mat& getK() const;
+	const Eigen::Matrix4f& getK() const;
 	
 	/**
 	 * Returns the intrinsic parameter matrix of the original images,
 	 */
-	const cv::Mat& getOriginalK() const;
+	const Eigen::Matrix4f& getOriginalK() const;
 	
 	/**
 	 * Returns the width of the undistorted images in pixels.
@@ -147,8 +146,8 @@ public:
 	bool isValid() const;
 	
 private:
-	cv::Mat K_;
-	cv::Mat originalK_;
+	Eigen::Matrix4f K_;
+	Eigen::Matrix4f originalK_;
 	
 	float inputCalibration[5];
 	float outputCalibration[5];
@@ -163,83 +162,6 @@ private:
 	bool valid;
 };
 
-class UndistorterOpenCV : public Undistorter
-{
-public:
-	/**
-	 * Creates an Undistorter by reading the distortion parameters from a file.
-	 * 
-	 * The file format is as follows:
-	 * fx fy cx cy d1 d2 d3 d4 d5 d6
-	 * inputWidth inputHeight
-	 * crop / full / none
-	 * outputWidth outputHeight
-	 */
-	UndistorterOpenCV(const char* configFileName);
-	
-	/**
-	 * Destructor.
-	 */
-	~UndistorterOpenCV();
-	
-	UndistorterOpenCV(const UndistorterOpenCV&) = delete;
-	UndistorterOpenCV& operator=(const UndistorterOpenCV&) = delete;
-	
-	/**
-	 * Undistorts the given image and returns the result image.
-	 */
-	void undistort(const cv::Mat& image, cv::OutputArray result) const;
-	
-	/**
-	 * Returns the intrinsic parameter matrix of the undistorted images.
-	 */
-	const cv::Mat& getK() const;
-	
-	/**
-	 * Returns the intrinsic parameter matrix of the original images,
-	 */
-	const cv::Mat& getOriginalK() const;
-	
-	/**
-	 * Returns the width of the undistorted images in pixels.
-	 */
-	int getOutputWidth() const;
-	
-	/**
-	 * Returns the height of the undistorted images in pixels.
-	 */
-	int getOutputHeight() const;
-	
-
-	/**
-	 * Returns the width of the input images in pixels.
-	 */
-	int getInputWidth() const;
-
-	/**
-	 * Returns the height of the input images in pixels.
-	 */
-	int getInputHeight() const;
-
-	/**
-	 * Returns if the undistorter was initialized successfully.
-	 */
-	bool isValid() const;
-	
-private:
-	cv::Mat K_;
-	cv::Mat originalK_;
-	
-	float inputCalibration[10];
-	float outputCalibration;
-	int out_width, out_height;
-	int in_width, in_height;
-	cv::Mat map1, map2;
-	
-	/// Is true if the undistorter object is valid (has been initialized with
-	/// a valid configuration)
-	bool valid;
-};
 
 }
 #endif
