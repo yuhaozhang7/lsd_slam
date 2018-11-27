@@ -771,7 +771,7 @@ void Frame::releaseIDepthVar(int level)
 
 void Frame::printfAssert(const char* message) const
 {
-	assert(!message);
+	assert(message);
 	printf("%s\n", message);
 }
 }
