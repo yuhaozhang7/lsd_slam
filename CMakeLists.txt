@@ -90,21 +90,6 @@ target_link_libraries(${appname}-${lsd_VERSION} ${common_libraries})
 SET_TARGET_PROPERTIES(${appname}-${lsd_VERSION} PROPERTIES COMPILE_FLAGS "-fPIC")
 
 
- install(TARGETS ${appname}-cpp  DESTINATION  /home/yuhao/lib/)
-
-SET(SLAMBENCH_C_WRAPPER                            -Wl,--whole-archive -L/home/yuhao/SLAM/slambench/build/lib slambench-c-wrapper                            -Wl,--no-whole-archive)
-SET(NULL_FILE_PATH	"/home/yuhao/SLAM/slambench/build/null.cpp")
-
-function(generate_slam_library library_name )
-
-    add_library(${library_name}-library SHARED ${NULL_FILE_PATH})
-    target_link_libraries(${library_name}-library PRIVATE ${SLAMBENCH_C_WRAPPER} ${library_name})
-    SET_TARGET_PROPERTIES(${library_name}-library PROPERTIES LINK_FLAGS "${ARGN}")
-    install(TARGETS ${library_name}-library  DESTINATION  /home/yuhao/lib/)
-
-endfunction()
-
-generate_slam_library(${appname}-cpp)
-
+ install(TARGETS ${appname}-cpp  DESTINATION  lib/)
 
 
