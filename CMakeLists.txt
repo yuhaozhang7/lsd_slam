@@ -37,14 +37,6 @@ set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -march=native")
 
 ENDIF(ANDROID)
 # ------------ COMMON  ------------ 
-set(G2O_TYPES_SIM3	/home/yuhao/SLAM/slambench/deps/g2o/lib/libg2o_types_sim3.so)
-set(G2O_TYPES_SBA	/home/yuhao/SLAM/slambench/deps/g2o/lib/libg2o_types_sba.so)
-set(G2O_CORE_LIBRARY	/home/yuhao/SLAM/slambench/deps/g2o/lib/libg2o_core.so)
-set(G2O_SOLVER_CSPARSE	/home/yuhao/SLAM/slambench/deps/g2o/lib/libg2o_solver_csparse.so)
-set(G2O_SOLVER_CSPARSE_EXTENSION	/home/yuhao/SLAM/slambench/deps/g2o/lib/libg2o_csparse_extension.so)
-set(G2O_STUFF_LIBRARY	/home/yuhao/SLAM/slambench/deps/g2o/lib/libg2o_stuff.so)
-set(CSPARSE_LIBRARY	/home/yuhao/SLAM/slambench/deps/suitesparse/lib/libcxsparse.a)
-
 set(common_libraries     ${G2O_TYPES_SIM3} ${G2O_TYPES_SBA}   ${G2O_CORE_LIBRARY}  ${G2O_SOLVER_CSPARSE} ${G2O_SOLVER_CSPARSE_EXTENSION} ${G2O_STUFF_LIBRARY}  ${CSPARSE_LIBRARY} )
 set(common_compile_flags "")
 
