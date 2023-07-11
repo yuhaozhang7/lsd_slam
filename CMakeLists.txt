@@ -6,12 +6,6 @@ FIND_PACKAGE(GLUT)
 
 
 find_package(OpenGL )
-find_package(Pangolin )
-find_package(OpenCV REQUIRED)
-find_package(SuiteSparse REQUIRED) # Apparently needed by g2o
-find_package(G2O REQUIRED)
-#find_package(Boost COMPONENTS thread filesystem system REQUIRED)
-find_package(Eigen3 REQUIRED)
 
 # --- common includes
 
@@ -90,5 +84,5 @@ SET_TARGET_PROPERTIES(${appname}-${lsd_VERSION} PROPERTIES COMPILE_FLAGS "-fPIC"
  install(TARGETS ${appname}-cpp  DESTINATION  lib/)
 
 
-generate_slam_library(${appname}-cpp)
+
 
