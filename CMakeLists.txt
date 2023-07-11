@@ -18,6 +18,7 @@ include_directories(
   ${CSPARSE_INCLUDE_DIR} #Has been set by SuiteParse
   ${CHOLMOD_INCLUDE_DIR} #Has been set by SuiteParse
   ${OpenCV_INCLUDE_DIRS}
+  ${SLAMBENCH_INCLUDE_DIR}
 )
 
 
@@ -36,6 +37,14 @@ set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -march=native")
 
 ENDIF(ANDROID)
 # ------------ COMMON  ------------ 
+set(G2O_TYPES_SIM3	/home/yuhao/SLAM/slambench/deps/g2o/lib/libg2o_types_sim3.so)
+set(G2O_TYPES_SBA	/home/yuhao/SLAM/slambench/deps/g2o/lib/libg2o_types_sba.so)
+set(G2O_CORE_LIBRARY	/home/yuhao/SLAM/slambench/deps/g2o/lib/libg2o_core.so)
+set(G2O_SOLVER_CSPARSE	/home/yuhao/SLAM/slambench/deps/g2o/lib/libg2o_solver_csparse.so)
+set(G2O_SOLVER_CSPARSE_EXTENSION	/home/yuhao/SLAM/slambench/deps/g2o/lib/libg2o_csparse_extension.so)
+set(G2O_STUFF_LIBRARY	/home/yuhao/SLAM/slambench/deps/g2o/lib/libg2o_stuff.so)
+set(CSPARSE_LIBRARY	/home/yuhao/SLAM/slambench/deps/suitesparse/lib/libcxsparse.a)
+
 set(common_libraries     ${G2O_TYPES_SIM3} ${G2O_TYPES_SBA}   ${G2O_CORE_LIBRARY}  ${G2O_SOLVER_CSPARSE} ${G2O_SOLVER_CSPARSE_EXTENSION} ${G2O_STUFF_LIBRARY}  ${CSPARSE_LIBRARY} )
 set(common_compile_flags "")
 
@@ -81,8 +90,21 @@ target_link_libraries(${appname}-${lsd_VERSION} ${common_libraries})
 SET_TARGET_PROPERTIES(${appname}-${lsd_VERSION} PROPERTIES COMPILE_FLAGS "-fPIC")
 
 
- install(TARGETS ${appname}-cpp  DESTINATION  lib/)
+ install(TARGETS ${appname}-cpp  DESTINATION  /home/yuhao/lib/)
 
+SET(SLAMBENCH_C_WRAPPER                            -Wl,--whole-archive -L/home/yuhao/SLAM/slambench/build/lib slambench-c-wrapper                            -Wl,--no-whole-archive)
+SET(NULL_FILE_PATH	"/home/yuhao/SLAM/slambench/build/null.cpp")
+
+function(generate_slam_library library_name )
+
+    add_library(${library_name}-library SHARED ${NULL_FILE_PATH})
+    target_link_libraries(${library_name}-library PRIVATE ${SLAMBENCH_C_WRAPPER} ${library_name})
+    SET_TARGET_PROPERTIES(${library_name}-library PROPERTIES LINK_FLAGS "${ARGN}")
+    install(TARGETS ${library_name}-library  DESTINATION  /home/yuhao/lib/)
+
+endfunction()
+
+generate_slam_library(${appname}-cpp)
 
 
 
