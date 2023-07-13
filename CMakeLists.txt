@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
 set(lsd_VERSION cpp)
+set(appname lsdslam)
 
 FIND_PACKAGE(GLUT)
 
