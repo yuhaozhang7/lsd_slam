@@ -83,7 +83,7 @@ target_link_libraries(${appname}-${lsd_VERSION} ${common_libraries})
 SET_TARGET_PROPERTIES(${appname}-${lsd_VERSION} PROPERTIES COMPILE_FLAGS "-fPIC")
 
 
-install(TARGETS ${appname}-cpp  DESTINATION  lib/)
+install(TARGETS ${appname}-${lsd_VERSION}  DESTINATION  lib/)
 
 # ------ Declare generate_slam_library function ------
 SET(SLAMBENCH_C_WRAPPER	-Wl,--whole-archive -L${WRAPPER_PATH} slambench-c-wrapper	-Wl,--no-whole-archive)
@@ -94,10 +94,9 @@ function(generate_slam_library library_name )
     add_library(${library_name}-library SHARED ${NULL_FILE_PATH})
     target_link_libraries(${library_name}-library PRIVATE ${SLAMBENCH_C_WRAPPER} ${library_name})
     SET_TARGET_PROPERTIES(${library_name}-library PROPERTIES LINK_FLAGS "${ARGN}")
+    SET_TARGET_PROPERTIES(${library_name}-library PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE INSTALL_RPATH "${LIB_PATH}")
     install(TARGETS ${library_name}-library  DESTINATION  lib/)
 
 endfunction()
 
-generate_slam_library(${appname}-cpp "")
-
-
+generate_slam_library(${appname}-${lsd_VERSION} "-Wl,--disable-new-dtags")
