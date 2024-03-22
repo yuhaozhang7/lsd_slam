@@ -19,7 +19,7 @@ include_directories(
   ${CSPARSE_INCLUDE_DIR} #Has been set by SuiteParse
   ${CHOLMOD_INCLUDE_DIR} #Has been set by SuiteParse
   ${OpenCV_INCLUDE_DIRS}
-  ${SLAMBENCH_INCLUDE_DIR}
+  ${SLAMFUSE_INCLUDE_DIR}
 )
 
 
