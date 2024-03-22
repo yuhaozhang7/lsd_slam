@@ -106,8 +106,8 @@ std::string ui_identifier;
 static slambench::TimeStamp last_frame_timestamp;
 
 
-static slambench::outputs::Output *pose_output;
-static slambench::outputs::Output *pointcloud_output;
+static slambench::outputs::Output *lsdslam_pose_output;
+static slambench::outputs::Output *lsdslam_pointcloud_output;
 
 static slambench::outputs::Output *grey_frame_output;
 
@@ -184,17 +184,17 @@ bool sb_init_slam_system(SLAMBenchLibraryHelper * slam_settings)  {
 	}
 
 	inputSize   = make_sb_uint2(grey_sensor->Width,grey_sensor->Height);
- 	pose_output = new slambench::outputs::Output("Pose", slambench::values::VT_POSE, true);
+ 	lsdslam_pose_output = new slambench::outputs::Output("LSD-SLAM Pose", slambench::values::VT_POSE, true);
 
-  	pointcloud_output = new slambench::outputs::Output("PointCloud", slambench::values::VT_POINTCLOUD, true);
-  	pointcloud_output->SetKeepOnlyMostRecent(true);
+  	lsdslam_pointcloud_output = new slambench::outputs::Output("LSD-SLAM PointCloud", slambench::values::VT_POINTCLOUD, true);
+  	lsdslam_pointcloud_output->SetKeepOnlyMostRecent(true);
 
   	grey_frame_output = new slambench::outputs::Output("Grey Frame", slambench::values::VT_FRAME);
   	grey_frame_output->SetKeepOnlyMostRecent(true);
 
 
-  	slam_settings->GetOutputManager().RegisterOutput(pose_output);
-  	slam_settings->GetOutputManager().RegisterOutput(pointcloud_output);
+  	slam_settings->GetOutputManager().RegisterOutput(lsdslam_pose_output);
+  	slam_settings->GetOutputManager().RegisterOutput(lsdslam_pointcloud_output);
   	slam_settings->GetOutputManager().RegisterOutput(grey_frame_output);
 
   	// Initialize Vertices
@@ -265,26 +265,26 @@ bool sb_update_outputs(SLAMBenchLibraryHelper *lib, const slambench::TimeStamp *
 	(void)lib;
 	(void)ts;
 
-	if(pose_output->IsActive()) {
+	if(lsdslam_pose_output->IsActive()) {
 		// Get the current pose as an eigen matrix
 		Eigen::Matrix4f matrix;
 		sb_get_pose(&matrix);
 
 		std::lock_guard<FastLock> lock (lib->GetOutputManager().GetLock());
-		pose_output->AddPoint(last_frame_timestamp, new slambench::values::PoseValue(matrix));
+		lsdslam_pose_output->AddPoint(last_frame_timestamp, new slambench::values::PoseValue(matrix));
 	}
 
 
 
 
 
-	if(pointcloud_output->IsActive()) {
+	if(lsdslam_pointcloud_output->IsActive()) {
 		auto map = outputWrapper->getMap () ;
 
 		// Take lock only after generating the map
 		std::lock_guard<FastLock> lock (lib->GetOutputManager().GetLock());
 		if (map)
-			pointcloud_output->AddPoint(last_frame_timestamp, map);
+			lsdslam_pointcloud_output->AddPoint(last_frame_timestamp, map);
 	}
 
 	if(grey_frame_output->IsActive()) {
